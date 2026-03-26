@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:t_app/core/theme/app_icon_tokens.dart';
+
 class _BottomTabIcon {
   const _BottomTabIcon({
     required this.selectedAsset,
@@ -59,9 +61,13 @@ class HomeBottomTabBar extends StatelessWidget {
       child: Row(
         children: List.generate(_icons.length, (index) {
           final icon = _icons[index];
-          final iconAsset = selectedIndex == index
+          final isSelected = selectedIndex == index;
+          final iconAsset = isSelected
               ? icon.selectedAsset
               : icon.deselectedAsset;
+          final iconColor = isSelected
+              ? AppIconTokens.navigationSelected(context)
+              : AppIconTokens.navigationUnselected(context);
 
           return Expanded(
             child: GestureDetector(
@@ -70,12 +76,11 @@ class HomeBottomTabBar extends StatelessWidget {
               child: Center(
                 child: AnimatedScale(
                   duration: const Duration(milliseconds: 170),
-                  scale: selectedIndex == index ? 1.0 : 0.92,
-                  child: Image.asset(
-                    iconAsset,
-                    width: 30,
-                    height: 30,
-                    fit: BoxFit.contain,
+                  scale: isSelected ? 1.0 : 0.92,
+                  child: ImageIcon(
+                    AssetImage(iconAsset),
+                    size: 30,
+                    color: iconColor,
                   ),
                 ),
               ),

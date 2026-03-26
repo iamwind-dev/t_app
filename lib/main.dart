@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'core/theme/app_theme.dart';
+import 'core/theme/system_ui_helper.dart';
 import 'core/theme/theme_mode_cubit.dart';
 import 'core/theme/theme_mode_storage.dart';
 import 'features/home/presentation/cubits/home_cubit.dart';
@@ -11,6 +13,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final themeModeStorage = ThemeModeStorage();
   final initialThemeMode = await themeModeStorage.load();
+
   runApp(
     TogetherApp(
       themeModeStorage: themeModeStorage,
@@ -19,7 +22,7 @@ Future<void> main() async {
   );
 }
 
-class TogetherApp extends StatefulWidget {
+class TogetherApp extends StatelessWidget {
   const TogetherApp({
     super.key,
     required this.themeModeStorage,
@@ -30,29 +33,16 @@ class TogetherApp extends StatefulWidget {
   final ThemeMode initialThemeMode;
 
   @override
-  State<TogetherApp> createState() => _TogetherAppState();
-}
-
-class _TogetherAppState extends State<TogetherApp> {
-  late final ThemeModeCubit _themeModeCubit = ThemeModeCubit(
-    initialThemeMode: widget.initialThemeMode,
-    storage: widget.themeModeStorage,
-  );
-  late final HomeCubit _homeCubit = HomeCubit();
-
-  @override
-  void dispose() {
-    _themeModeCubit.close();
-    _homeCubit.close();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider<ThemeModeCubit>.value(value: _themeModeCubit),
-        BlocProvider<HomeCubit>.value(value: _homeCubit),
+        BlocProvider(
+          create: (_) => ThemeModeCubit(
+            initialThemeMode: initialThemeMode,
+            storage: themeModeStorage,
+          ),
+        ),
+        BlocProvider(create: (_) => HomeCubit()),
       ],
       child: BlocBuilder<ThemeModeCubit, ThemeMode>(
         builder: (context, themeMode) {
@@ -62,10 +52,44 @@ class _TogetherAppState extends State<TogetherApp> {
             themeMode: themeMode,
             theme: AppTheme.light(),
             darkTheme: AppTheme.dark(),
+            builder: (context, child) {
+              return _SystemUiOverlaySync(
+                child: child ?? const SizedBox.shrink(),
+              );
+            },
             home: const HomeScreen(),
           );
         },
       ),
+    );
+  }
+}
+
+class _SystemUiOverlaySync extends StatefulWidget {
+  const _SystemUiOverlaySync({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_SystemUiOverlaySync> createState() => _SystemUiOverlaySyncState();
+}
+
+class _SystemUiOverlaySyncState extends State<_SystemUiOverlaySync> {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    SystemChrome.setSystemUIOverlayStyle(
+      SystemUiHelper.overlayStyleFor(Theme.of(context)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final overlayStyle = SystemUiHelper.overlayStyleFor(Theme.of(context));
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlayStyle,
+      child: widget.child,
     );
   }
 }

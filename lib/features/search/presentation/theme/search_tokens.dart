@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:t_app/core/theme/app_icon_tokens.dart';
+
 @immutable
 final class SearchTokens {
   const SearchTokens._();
@@ -26,6 +28,10 @@ final class SearchTokens {
 
   static Color hintText(BuildContext context) {
     return Theme.of(context).colorScheme.onSurfaceVariant;
+  }
+
+  static Color searchIcon(BuildContext context) {
+    return AppIconTokens.utilityMuted(context);
   }
 
   static Color avatarLetterBackground(BuildContext context) {

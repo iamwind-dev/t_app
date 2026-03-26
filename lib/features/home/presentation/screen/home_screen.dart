@@ -6,7 +6,9 @@ import 'package:t_app/features/search/presentation/screen/search_screen.dart';
 
 import '../cubits/home_cubit.dart';
 import '../cubits/home_state.dart';
+import '../widget/create_post_card.dart';
 import '../widget/home_header.dart';
+import '../widget/post_divider.dart';
 import '../widget/thread_post_card.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -80,7 +82,6 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, state) {
         final isSearchTab = state.selectedTabIndex == 1;
         final shouldShowBottomBar = isSearchTab || _isBottomBarVisible;
-        final dividerColor = Theme.of(context).dividerColor;
 
         return Scaffold(
           body: SafeArea(
@@ -101,16 +102,21 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ? _bottomSpace(context)
                                 : 12,
                           ),
-                          itemCount: state.posts.length,
+                          itemCount: state.feedItems.length + 1,
                           itemBuilder: (context, index) {
-                            return ThreadPostCard(post: state.posts[index]);
+                            if (index == 0) {
+                              return CreatePostCard(
+                                currentUser: state.currentUser,
+                                onTap: () {},
+                              );
+                            }
+
+                            return ThreadItemCard(
+                              data: state.feedItems[index - 1],
+                            );
                           },
                           separatorBuilder: (_, __) {
-                            return Divider(
-                              height: 1,
-                              thickness: 1,
-                              color: dividerColor,
-                            );
+                            return const PostDivider();
                           },
                         ),
                       ),

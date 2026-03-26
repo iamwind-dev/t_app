@@ -90,16 +90,22 @@ class _HeaderSection extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  SvgPicture.asset(
-                    'assets/icons/search/search_magnifier.svg',
-                    width: SearchTokens.searchIconSize,
-                    height: SearchTokens.searchIconSize,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const SizedBox(
-                        width: SearchTokens.searchIconSize,
-                        height: SearchTokens.searchIconSize,
-                      );
-                    },
+                  ColorFiltered(
+                    colorFilter: ColorFilter.mode(
+                      SearchTokens.searchIcon(context),
+                      BlendMode.srcIn,
+                    ),
+                    child: SvgPicture.asset(
+                      'assets/icons/search/search_magnifier.svg',
+                      width: SearchTokens.searchIconSize,
+                      height: SearchTokens.searchIconSize,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const SizedBox(
+                          width: SearchTokens.searchIconSize,
+                          height: SearchTokens.searchIconSize,
+                        );
+                      },
+                    ),
                   ),
                   const SizedBox(width: SearchTokens.searchIconGap),
                   Expanded(

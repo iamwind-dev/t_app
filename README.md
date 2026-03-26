@@ -1,4 +1,4 @@
-# Together App
+# ogether App
 
 Flutter demo app mo phong giao dien social feed kieu Threads, hien co 2 luong chinh la `Home feed` va `Search`, kem theo chuyen theme sang `System/Light/Dark`.
 
@@ -7,6 +7,44 @@ Flutter demo app mo phong giao dien social feed kieu Threads, hien co 2 luong ch
 - Flutter SDK 3.x
 - Dart SDK 3.x
 - Thiet bi gia lap hoac trinh duyet de chay Flutter
+
+## Huong dan setup theo quy trinh B1-B3
+
+### B1: Cai dat FVM
+
+- Cai Flutter version bang FVM:
+
+```bash
+fvm install 3.41.2
+```
+
+- Them vao file `.vscode/settings.json`:
+
+```json
+{
+   "dart.flutterSdkPath": ".fvm/versions/3.41.2"
+}
+```
+
+### B2: Tao file `.env`
+
+Them noi dung sau vao file `.env` o thu muc goc du an:
+
+```env
+API_URL = 'https://digital-business-card-api.com'
+APP_STORE_ID = '5245641223'
+```
+
+### B3: Chay lenh generate
+
+Chay lan luot cac lenh sau:
+
+```bash
+fvm flutter clean
+fvm flutter pub get
+fvm dart run intl_utils:generate
+fvm dart run build_runner build --delete-conflicting-outputs
+```
 
 ## Cai dat va chay
 
