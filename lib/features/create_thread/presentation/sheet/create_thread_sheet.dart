@@ -8,11 +8,13 @@ Future<void> showCreateThreadSheet({
   required BuildContext context,
   required User currentUser,
 }) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    barrierColor: Colors.black54,
+    barrierColor: isDark ? Colors.black54 : Colors.black12,
     builder: (context) {
       return CreateThreadSheet(currentUser: currentUser);
     },
