@@ -7,13 +7,11 @@ Future<void> showCreateThreadSheet({
   required BuildContext context,
   required User currentUser,
 }) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    barrierColor: isDark ? Colors.black54 : Colors.black12,
+    barrierColor: Colors.black54,
     builder: (context) {
       return CreateThreadSheet(currentUser: currentUser);
     },
@@ -389,7 +387,7 @@ class ThreadDraftItemComposer extends StatelessWidget {
                     isDense: true,
                     hintText: 'Có gì mới?',
                     hintStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                      color: colorScheme.onSurfaceVariant,
                     ),
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.zero,
@@ -673,7 +671,7 @@ class _PostingAiCheckOverlayState extends State<PostingAiCheckOverlay>
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      color: Colors.black.withValues(alpha: 0.4),
+      color: colorScheme.surface.withValues(alpha: 0.8),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
