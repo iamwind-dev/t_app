@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:t_app/core/theme/app_theme.dart';
 import 'package:t_app/features/create_thread/data/models/thread_draft.dart';
 import 'package:t_app/features/post_detail/data/models/user.dart';
 import 'package:t_app/features/post_detail/presentation/widget/avatar_view.dart';
@@ -120,69 +121,76 @@ class _CreateThreadSheetState extends State<CreateThreadSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return Theme(
+      data: AppTheme.dark(),
+      child: Builder(
+        builder: (context) {
+          final theme = Theme.of(context);
+          final colorScheme = theme.colorScheme;
+          final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
-    return AnimatedPadding(
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: FractionallySizedBox(
-        heightFactor: 0.94,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: const Color(0xFF0A0A0A),
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(28),
-            ),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.24),
-            ),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Stack(
-              children: [
-                Column(
-                  children: [
-                    const SizedBox(height: 10),
-                    CreateThreadHeader(onCancel: () => Navigator.of(context).pop()),
-                    Divider(
-                      height: 1,
-                      color: theme.dividerColor,
-                    ),
-                    Expanded(
-                      child: ThreadDraftComposer(
-                        currentUser: widget.currentUser,
-                        draft: _draft,
-                        controllers: _controllers,
-                        focusNodes: _focusNodes,
-                        onChanged: _updateDraftItem,
-                        onAddToThread: _addDraftItem,
-                      ),
-                    ),
-                    CreateThreadFooter(
-                      replyControlsEnabled: _replyControlsEnabled,
-                      onToggleReplyControls: () {
-                        setState(() {
-                          _replyControlsEnabled = !_replyControlsEnabled;
-                        });
-                      },
-                      onSubmit: _submit,
-                      postState: _postState,
-                    ),
-                  ],
-                ),
-                if (_postState != PostState.idle)
-                  PostingAiCheckOverlay(
-                    statusText: _statusText,
-                    postState: _postState,
+          return AnimatedPadding(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            padding: EdgeInsets.only(bottom: bottomInset),
+            child: FractionallySizedBox(
+              heightFactor: 0.94,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0A0A0A),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(28),
                   ),
-              ],
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.24),
+                  ),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Stack(
+                    children: [
+                      Column(
+                        children: [
+                          const SizedBox(height: 10),
+                          CreateThreadHeader(onCancel: () => Navigator.of(context).pop()),
+                          Divider(
+                            height: 1,
+                            color: theme.dividerColor,
+                          ),
+                          Expanded(
+                            child: ThreadDraftComposer(
+                              currentUser: widget.currentUser,
+                              draft: _draft,
+                              controllers: _controllers,
+                              focusNodes: _focusNodes,
+                              onChanged: _updateDraftItem,
+                              onAddToThread: _addDraftItem,
+                            ),
+                          ),
+                          CreateThreadFooter(
+                            replyControlsEnabled: _replyControlsEnabled,
+                            onToggleReplyControls: () {
+                              setState(() {
+                                _replyControlsEnabled = !_replyControlsEnabled;
+                              });
+                            },
+                            onSubmit: _submit,
+                            postState: _postState,
+                          ),
+                        ],
+                      ),
+                      if (_postState != PostState.idle)
+                        PostingAiCheckOverlay(
+                          statusText: _statusText,
+                          postState: _postState,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
