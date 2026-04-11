@@ -11,12 +11,14 @@ Future<void> showCreateThreadSheet({
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withValues(alpha: 0.5),
+    barrierColor: Colors.black54,
     builder: (context) {
       return CreateThreadSheet(currentUser: currentUser);
     },
   );
 }
+
+enum PostState { idle, aiChecking, postingSuccess }
 
 class CreateThreadSheet extends StatefulWidget {
   const CreateThreadSheet({
@@ -35,6 +37,8 @@ class _CreateThreadSheetState extends State<CreateThreadSheet> {
   late List<TextEditingController> _controllers;
   late List<FocusNode> _focusNodes;
   bool _replyControlsEnabled = true;
+  PostState _postState = PostState.idle;
+  String _statusText = '';
 
   @override
   void initState() {
@@ -86,7 +90,31 @@ class _CreateThreadSheetState extends State<CreateThreadSheet> {
     });
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (_postState != PostState.idle) return;
+
+    setState(() {
+      _postState = PostState.aiChecking;
+      _statusText = 'Đang kiểm tra nội dung...';
+    });
+
+    await Future<void>.delayed(const Duration(milliseconds: 1000));
+    if (!mounted) return;
+    setState(() => _statusText = 'Đang phân tích ngữ cảnh...');
+
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+    if (!mounted) return;
+    setState(() => _statusText = 'Đang đánh giá mức độ phù hợp...');
+
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+    setState(() {
+      _postState = PostState.postingSuccess;
+      _statusText = 'Đăng thành công';
+    });
+
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    if (!mounted) return;
     Navigator.of(context).pop();
   }
 
@@ -114,33 +142,43 @@ class _CreateThreadSheetState extends State<CreateThreadSheet> {
           ),
           child: SafeArea(
             top: false,
-            child: Column(
+            child: Stack(
               children: [
-                const SizedBox(height: 10),
-                CreateThreadHeader(onCancel: () => Navigator.of(context).pop()),
-                Divider(
-                  height: 1,
-                  color: theme.dividerColor,
+                Column(
+                  children: [
+                    const SizedBox(height: 10),
+                    CreateThreadHeader(onCancel: () => Navigator.of(context).pop()),
+                    Divider(
+                      height: 1,
+                      color: theme.dividerColor,
+                    ),
+                    Expanded(
+                      child: ThreadDraftComposer(
+                        currentUser: widget.currentUser,
+                        draft: _draft,
+                        controllers: _controllers,
+                        focusNodes: _focusNodes,
+                        onChanged: _updateDraftItem,
+                        onAddToThread: _addDraftItem,
+                      ),
+                    ),
+                    CreateThreadFooter(
+                      replyControlsEnabled: _replyControlsEnabled,
+                      onToggleReplyControls: () {
+                        setState(() {
+                          _replyControlsEnabled = !_replyControlsEnabled;
+                        });
+                      },
+                      onSubmit: _submit,
+                      postState: _postState,
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: ThreadDraftComposer(
-                    currentUser: widget.currentUser,
-                    draft: _draft,
-                    controllers: _controllers,
-                    focusNodes: _focusNodes,
-                    onChanged: _updateDraftItem,
-                    onAddToThread: _addDraftItem,
+                if (_postState != PostState.idle)
+                  PostingAiCheckOverlay(
+                    statusText: _statusText,
+                    postState: _postState,
                   ),
-                ),
-                CreateThreadFooter(
-                  replyControlsEnabled: _replyControlsEnabled,
-                  onToggleReplyControls: () {
-                    setState(() {
-                      _replyControlsEnabled = !_replyControlsEnabled;
-                    });
-                  },
-                  onSubmit: _submit,
-                ),
               ],
             ),
           ),
@@ -450,15 +488,19 @@ class CreateThreadFooter extends StatelessWidget {
     required this.replyControlsEnabled,
     required this.onToggleReplyControls,
     required this.onSubmit,
+    required this.postState,
   });
 
   final bool replyControlsEnabled;
   final VoidCallback onToggleReplyControls;
   final VoidCallback onSubmit;
+  final PostState postState;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isChecking = postState == PostState.aiChecking;
+    final isSuccess = postState == PostState.postingSuccess;
 
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -491,31 +533,35 @@ class CreateThreadFooter extends StatelessWidget {
           ),
           const Spacer(),
           GestureDetector(
-            onTap: onToggleReplyControls,
+            onTap: isChecking || isSuccess ? null : onToggleReplyControls,
             behavior: HitTestBehavior.opaque,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 52,
-              height: 30,
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                color: replyControlsEnabled
-                    ? colorScheme.onSurface
-                    : colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Align(
-                alignment: replyControlsEnabled
-                    ? Alignment.centerRight
-                    : Alignment.centerLeft,
-                child: Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: replyControlsEnabled
-                        ? const Color(0xFF0A0A0A)
-                        : colorScheme.onSurface,
-                    shape: BoxShape.circle,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 200),
+              opacity: isChecking || isSuccess ? 0.5 : 1.0,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 52,
+                height: 30,
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: replyControlsEnabled
+                      ? colorScheme.onSurface
+                      : colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Align(
+                  alignment: replyControlsEnabled
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: replyControlsEnabled
+                          ? const Color(0xFF0A0A0A)
+                          : colorScheme.onSurface,
+                      shape: BoxShape.circle,
+                    ),
                   ),
                 ),
               ),
@@ -523,26 +569,229 @@ class CreateThreadFooter extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           GestureDetector(
-            onTap: onSubmit,
+            onTap: isChecking || isSuccess ? null : onSubmit,
             behavior: HitTestBehavior.opaque,
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
               height: 38,
-              padding: const EdgeInsets.symmetric(horizontal: 18),
+              padding: EdgeInsets.symmetric(
+                horizontal: isChecking || isSuccess ? 12 : 18,
+              ),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
+                color: isSuccess
+                    ? Colors.green.withValues(alpha: 0.2)
+                    : colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(999),
+                border: isSuccess
+                    ? Border.all(color: Colors.green.withValues(alpha: 0.5))
+                    : null,
               ),
               alignment: Alignment.center,
-              child: Text(
-                'Đăng',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: colorScheme.onSurface,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isChecking) ...[
+                    SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  if (isSuccess) ...[
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      size: 18,
+                      color: Colors.green,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    isSuccess ? 'Thành công' : 'Đăng',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: isSuccess ? Colors.green : colorScheme.onSurface,
+                        ),
+                  ),
+                ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class PostingAiCheckOverlay extends StatefulWidget {
+  const PostingAiCheckOverlay({
+    super.key,
+    required this.statusText,
+    required this.postState,
+  });
+
+  final String statusText;
+  final PostState postState;
+
+  @override
+  State<PostingAiCheckOverlay> createState() => _PostingAiCheckOverlayState();
+}
+
+class _PostingAiCheckOverlayState extends State<PostingAiCheckOverlay>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scanAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+
+    _scanAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      color: Colors.black.withValues(alpha: 0.4),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                // Pulse background
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.8, end: 1.2),
+                  duration: const Duration(seconds: 1),
+                  curve: Curves.easeInOut,
+                  builder: (context, value, child) {
+                    return Container(
+                      width: 120 * value,
+                      height: 120 * value,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: widget.postState == PostState.postingSuccess
+                                ? Colors.green.withValues(alpha: 0.15)
+                                : colorScheme.primary.withValues(alpha: 0.15),
+                            blurRadius: 40,
+                            spreadRadius: 10,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  onEnd: () {}, // Handled by repeating tween if needed, but simple pulse is fine
+                ),
+                // AI/Scan Container
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF121212),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: widget.postState == PostState.postingSuccess
+                          ? Colors.green.withValues(alpha: 0.4)
+                          : colorScheme.onSurface.withValues(alpha: 0.1),
+                      width: 2,
+                    ),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: widget.postState == PostState.postingSuccess
+                      ? const Center(
+                          child: Icon(
+                            Icons.check_rounded,
+                            color: Colors.green,
+                            size: 48,
+                          ),
+                        )
+                      : Stack(
+                          children: [
+                            Center(
+                              child: Icon(
+                                Icons.auto_awesome,
+                                color: colorScheme.onSurface.withValues(alpha: 0.6),
+                                size: 36,
+                              ),
+                            ),
+                            // Scanning line
+                            AnimatedBuilder(
+                              animation: _scanAnimation,
+                              builder: (context, child) {
+                                return Positioned(
+                                  top: _scanAnimation.value * 100,
+                                  left: 0,
+                                  right: 0,
+                                  child: Container(
+                                    height: 2,
+                                    decoration: BoxDecoration(
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: colorScheme.primary
+                                              .withValues(alpha: 0.8),
+                                          blurRadius: 8,
+                                          spreadRadius: 2,
+                                        ),
+                                      ],
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          colorScheme.primary
+                                              .withValues(alpha: 0.0),
+                                          colorScheme.primary
+                                              .withValues(alpha: 1.0),
+                                          colorScheme.primary
+                                              .withValues(alpha: 0.0),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: Text(
+                widget.statusText,
+                key: ValueKey(widget.statusText),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: widget.postState == PostState.postingSuccess
+                          ? Colors.green
+                          : colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.2,
+                    ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
