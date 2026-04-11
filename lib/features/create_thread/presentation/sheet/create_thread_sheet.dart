@@ -137,7 +137,7 @@ class _CreateThreadSheetState extends State<CreateThreadSheet> {
               heightFactor: 0.94,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0A0A0A),
+                  color: colorScheme.surface,
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(28),
                   ),
@@ -518,7 +518,7 @@ class CreateThreadFooter extends StatelessWidget {
         12 + MediaQuery.paddingOf(context).bottom,
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFF0A0A0A),
+        color: colorScheme.surface,
         border: Border(
           top: BorderSide(
             color: Theme.of(context).dividerColor,
@@ -566,7 +566,7 @@ class CreateThreadFooter extends StatelessWidget {
                     height: 24,
                     decoration: BoxDecoration(
                       color: replyControlsEnabled
-                          ? const Color(0xFF0A0A0A)
+                          ? colorScheme.surface
                           : colorScheme.onSurface,
                       shape: BoxShape.circle,
                     ),
@@ -717,7 +717,7 @@ class _PostingAiCheckOverlayState extends State<PostingAiCheckOverlay>
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF121212),
+                    color: colorScheme.surface,
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: widget.postState == PostState.postingSuccess
