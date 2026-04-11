@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:t_app/core/theme/app_theme.dart';
 import 'package:t_app/features/create_thread/data/models/thread_draft.dart';
 import 'package:t_app/features/post_detail/data/models/user.dart';
 import 'package:t_app/features/post_detail/presentation/widget/avatar_view.dart';
@@ -123,31 +122,27 @@ class _CreateThreadSheetState extends State<CreateThreadSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: AppTheme.dark(),
-      child: Builder(
-        builder: (context) {
-          final theme = Theme.of(context);
-          final colorScheme = theme.colorScheme;
-          final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
-          return AnimatedPadding(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            padding: EdgeInsets.only(bottom: bottomInset),
-            child: FractionallySizedBox(
-              heightFactor: 0.94,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: colorScheme.surface,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(28),
-                  ),
-                  border: Border.all(
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.24),
-                  ),
-                ),
-                child: SafeArea(
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: FractionallySizedBox(
+        heightFactor: 0.94,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(28),
+            ),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.24),
+            ),
+          ),
+          child: SafeArea(
                   top: false,
                   child: Stack(
                     children: [
@@ -192,9 +187,6 @@ class _CreateThreadSheetState extends State<CreateThreadSheet> {
               ),
             ),
           );
-        },
-      ),
-    );
   }
 }
 
