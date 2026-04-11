@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:t_app/features/create_thread/data/models/thread_draft.dart';
+import 'package:t_app/features/create_thread/presentation/widget/ai_scanning_text.dart';
 import 'package:t_app/features/post_detail/data/models/user.dart';
 import 'package:t_app/features/post_detail/presentation/widget/avatar_view.dart';
 
@@ -32,13 +33,14 @@ class CreateThreadSheet extends StatefulWidget {
   State<CreateThreadSheet> createState() => _CreateThreadSheetState();
 }
 
-class _CreateThreadSheetState extends State<CreateThreadSheet> {
+class _CreateThreadSheetState extends State<CreateThreadSheet>
+    with SingleTickerProviderStateMixin {
   late ThreadDraft _draft;
   late List<TextEditingController> _controllers;
   late List<FocusNode> _focusNodes;
   bool _replyControlsEnabled = true;
   PostState _postState = PostState.idle;
-  String _statusText = '';
+  late AnimationController _scanController;
 
   @override
   void initState() {
@@ -48,10 +50,15 @@ class _CreateThreadSheetState extends State<CreateThreadSheet> {
     );
     _controllers = [TextEditingController()];
     _focusNodes = [FocusNode()];
+    _scanController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
   }
 
   @override
   void dispose() {
+    _scanController.dispose();
     for (final controller in _controllers) {
       controller.dispose();
     }
@@ -95,22 +102,19 @@ class _CreateThreadSheetState extends State<CreateThreadSheet> {
 
     setState(() {
       _postState = PostState.aiChecking;
-      _statusText = 'Đang kiểm tra nội dung...';
     });
-
-    await Future<void>.delayed(const Duration(milliseconds: 1000));
-    if (!mounted) return;
-    setState(() => _statusText = 'Đang phân tích ngữ cảnh...');
+    _scanController.forward(from: 0.0);
 
     await Future<void>.delayed(const Duration(milliseconds: 800));
     if (!mounted) return;
-    setState(() => _statusText = 'Đang đánh giá mức độ phù hợp...');
 
-    await Future<void>.delayed(const Duration(milliseconds: 600));
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    if (!mounted) return;
+
+    await Future<void>.delayed(const Duration(milliseconds: 700));
     if (!mounted) return;
     setState(() {
       _postState = PostState.postingSuccess;
-      _statusText = 'Đăng thành công';
     });
 
     await Future<void>.delayed(const Duration(milliseconds: 1200));
@@ -141,50 +145,43 @@ class _CreateThreadSheetState extends State<CreateThreadSheet> {
             ),
           ),
           child: SafeArea(
-                  top: false,
-                  child: Stack(
-                    children: [
-                      Column(
-                        children: [
-                          const SizedBox(height: 10),
-                          CreateThreadHeader(onCancel: () => Navigator.of(context).pop()),
-                          Divider(
-                            height: 1,
-                            color: theme.dividerColor,
-                          ),
-                          Expanded(
-                            child: ThreadDraftComposer(
-                              currentUser: widget.currentUser,
-                              draft: _draft,
-                              controllers: _controllers,
-                              focusNodes: _focusNodes,
-                              onChanged: _updateDraftItem,
-                              onAddToThread: _addDraftItem,
-                            ),
-                          ),
-                          CreateThreadFooter(
-                            replyControlsEnabled: _replyControlsEnabled,
-                            onToggleReplyControls: () {
-                              setState(() {
-                                _replyControlsEnabled = !_replyControlsEnabled;
-                              });
-                            },
-                            onSubmit: _submit,
-                            postState: _postState,
-                          ),
-                        ],
-                      ),
-                      if (_postState != PostState.idle)
-                        PostingAiCheckOverlay(
-                          statusText: _statusText,
-                          postState: _postState,
-                        ),
-                    ],
+            top: false,
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                CreateThreadHeader(onCancel: () => Navigator.of(context).pop()),
+                Divider(
+                  height: 1,
+                  color: theme.dividerColor,
+                ),
+                Expanded(
+                  child: ThreadDraftComposer(
+                    currentUser: widget.currentUser,
+                    draft: _draft,
+                    controllers: _controllers,
+                    focusNodes: _focusNodes,
+                    onChanged: _updateDraftItem,
+                    onAddToThread: _addDraftItem,
+                    postState: _postState,
+                    scanController: _scanController,
                   ),
                 ),
-              ),
+                CreateThreadFooter(
+                  replyControlsEnabled: _replyControlsEnabled,
+                  onToggleReplyControls: () {
+                    setState(() {
+                      _replyControlsEnabled = !_replyControlsEnabled;
+                    });
+                  },
+                  onSubmit: _submit,
+                  postState: _postState,
+                ),
+              ],
             ),
-          );
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -255,6 +252,8 @@ class ThreadDraftComposer extends StatelessWidget {
     required this.focusNodes,
     required this.onChanged,
     required this.onAddToThread,
+    required this.postState,
+    required this.scanController,
   });
 
   final User currentUser;
@@ -263,6 +262,8 @@ class ThreadDraftComposer extends StatelessWidget {
   final List<FocusNode> focusNodes;
   final void Function(int index, String value) onChanged;
   final VoidCallback onAddToThread;
+  final PostState postState;
+  final AnimationController scanController;
 
   @override
   Widget build(BuildContext context) {
@@ -277,6 +278,8 @@ class ThreadDraftComposer extends StatelessWidget {
           isLastItem: index == draft.items.length - 1,
           onChanged: (value) => onChanged(index, value),
           onAddToThread: onAddToThread,
+          postState: postState,
+          scanController: scanController,
         );
       },
     );
@@ -292,6 +295,8 @@ class ThreadDraftItemComposer extends StatelessWidget {
     required this.isLastItem,
     required this.onChanged,
     required this.onAddToThread,
+    required this.postState,
+    required this.scanController,
   });
 
   final User currentUser;
@@ -300,6 +305,8 @@ class ThreadDraftItemComposer extends StatelessWidget {
   final bool isLastItem;
   final ValueChanged<String> onChanged;
   final VoidCallback onAddToThread;
+  final PostState postState;
+  final AnimationController scanController;
 
   @override
   Widget build(BuildContext context) {
@@ -307,6 +314,9 @@ class ThreadDraftItemComposer extends StatelessWidget {
     const avatarRadius = 20.0;
     const smallAvatarRadius = 11.0;
     const leftColumnWidth = 48.0;
+
+    final isCheckingOrSuccess = postState != PostState.idle;
+    final isSuccess = postState == PostState.postingSuccess;
 
     return Padding(
       padding: EdgeInsets.only(bottom: isLastItem ? 0 : 18),
@@ -373,26 +383,38 @@ class ThreadDraftItemComposer extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 10),
-                TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  onChanged: onChanged,
-                  maxLines: null,
-                  minLines: 4,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: colorScheme.onSurface,
-                    height: 1.35,
-                  ),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    hintText: 'Có gì mới?',
-                    hintStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  cursorColor: colorScheme.onSurface,
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: isCheckingOrSuccess
+                      ? AnimatedBuilder(
+                          animation: scanController,
+                          builder: (context, _) => AiScanningText(
+                            text: controller.text,
+                            progress: scanController.value,
+                            isSuccess: isSuccess,
+                          ),
+                        )
+                      : TextField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          onChanged: onChanged,
+                          maxLines: null,
+                          minLines: 4,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: colorScheme.onSurface,
+                            height: 1.35,
+                          ),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            hintText: 'Có gì mới?',
+                            hintStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          cursorColor: colorScheme.onSurface,
+                        ),
                 ),
                 const SizedBox(height: 12),
                 const ComposerToolbar(),
@@ -623,175 +645,6 @@ class CreateThreadFooter extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class PostingAiCheckOverlay extends StatefulWidget {
-  const PostingAiCheckOverlay({
-    super.key,
-    required this.statusText,
-    required this.postState,
-  });
-
-  final String statusText;
-  final PostState postState;
-
-  @override
-  State<PostingAiCheckOverlay> createState() => _PostingAiCheckOverlayState();
-}
-
-class _PostingAiCheckOverlayState extends State<PostingAiCheckOverlay>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scanAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat();
-
-    _scanAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      color: colorScheme.surface.withValues(alpha: 0.8),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                // Pulse background
-                TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0.8, end: 1.2),
-                  duration: const Duration(seconds: 1),
-                  curve: Curves.easeInOut,
-                  builder: (context, value, child) {
-                    return Container(
-                      width: 120 * value,
-                      height: 120 * value,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: widget.postState == PostState.postingSuccess
-                                ? Colors.green.withValues(alpha: 0.15)
-                                : colorScheme.primary.withValues(alpha: 0.15),
-                            blurRadius: 40,
-                            spreadRadius: 10,
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  onEnd: () {}, // Handled by repeating tween if needed, but simple pulse is fine
-                ),
-                // AI/Scan Container
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: widget.postState == PostState.postingSuccess
-                          ? Colors.green.withValues(alpha: 0.4)
-                          : colorScheme.onSurface.withValues(alpha: 0.1),
-                      width: 2,
-                    ),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: widget.postState == PostState.postingSuccess
-                      ? const Center(
-                          child: Icon(
-                            Icons.check_rounded,
-                            color: Colors.green,
-                            size: 48,
-                          ),
-                        )
-                      : Stack(
-                          children: [
-                            Center(
-                              child: Icon(
-                                Icons.auto_awesome,
-                                color: colorScheme.onSurface.withValues(alpha: 0.6),
-                                size: 36,
-                              ),
-                            ),
-                            // Scanning line
-                            AnimatedBuilder(
-                              animation: _scanAnimation,
-                              builder: (context, child) {
-                                return Positioned(
-                                  top: _scanAnimation.value * 100,
-                                  left: 0,
-                                  right: 0,
-                                  child: Container(
-                                    height: 2,
-                                    decoration: BoxDecoration(
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: colorScheme.primary
-                                              .withValues(alpha: 0.8),
-                                          blurRadius: 8,
-                                          spreadRadius: 2,
-                                        ),
-                                      ],
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          colorScheme.primary
-                                              .withValues(alpha: 0.0),
-                                          colorScheme.primary
-                                              .withValues(alpha: 1.0),
-                                          colorScheme.primary
-                                              .withValues(alpha: 0.0),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: Text(
-                widget.statusText,
-                key: ValueKey(widget.statusText),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: widget.postState == PostState.postingSuccess
-                          ? Colors.green
-                          : colorScheme.onSurface,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.2,
-                    ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
