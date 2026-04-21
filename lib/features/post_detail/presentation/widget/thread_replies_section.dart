@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:t_app/features/home/presentation/widget/post_divider.dart';
 
 import '../../data/models/thread_item_model.dart';
 import 'thread_item_widget.dart';
@@ -8,10 +9,12 @@ class ThreadRepliesSection extends StatefulWidget {
     super.key,
     required this.rootThread,
     required this.onThreadTap,
+    required this.onReplyTap,
   });
 
   final ThreadItemModel rootThread;
   final ValueChanged<ThreadItemModel> onThreadTap;
+  final ValueChanged<ThreadItemModel> onReplyTap;
 
   @override
   State<ThreadRepliesSection> createState() => _ThreadRepliesSectionState();
@@ -44,7 +47,7 @@ class _ThreadRepliesSectionState extends State<ThreadRepliesSection> {
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(
-          'Chưa có phản hồi nào cho thread này.',
+          'Chua co phan hoi nao cho thread nay.',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
       );
@@ -52,19 +55,21 @@ class _ThreadRepliesSectionState extends State<ThreadRepliesSection> {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: List.generate(rootReplies.length, (index) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: index == rootReplies.length - 1 ? 0 : 16,
+      children: [
+        for (var index = 0; index < rootReplies.length; index++) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 12, 0, 12),
+            child: ThreadBranchBlock(
+              rootReply: rootReplies[index],
+              expandedThreadIds: _expandedThreadIds,
+              onThreadTap: widget.onThreadTap,
+              onReplyTap: widget.onReplyTap,
+              onExpandReplies: _expandReplies,
+            ),
           ),
-          child: ThreadBranchBlock(
-            rootReply: rootReplies[index],
-            expandedThreadIds: _expandedThreadIds,
-            onThreadTap: widget.onThreadTap,
-            onExpandReplies: _expandReplies,
-          ),
-        );
-      }),
+          if (index != rootReplies.length - 1) const PostDivider(),
+        ],
+      ],
     );
   }
 }
@@ -75,6 +80,7 @@ class ThreadBranchBlock extends StatefulWidget {
     required this.rootReply,
     required this.expandedThreadIds,
     required this.onThreadTap,
+    required this.onReplyTap,
     required this.onExpandReplies,
     this.highlightedThreadId,
   });
@@ -82,6 +88,7 @@ class ThreadBranchBlock extends StatefulWidget {
   final ThreadItemModel rootReply;
   final Set<String> expandedThreadIds;
   final ValueChanged<ThreadItemModel> onThreadTap;
+  final ValueChanged<ThreadItemModel> onReplyTap;
   final ValueChanged<String> onExpandReplies;
   final String? highlightedThreadId;
 
@@ -146,7 +153,7 @@ class _ThreadBranchBlockState extends State<ThreadBranchBlock> {
               child: ThreadItemWidget(
                 thread: thread,
                 onTap: () => widget.onThreadTap(thread),
-                onReplyTap: () => widget.onThreadTap(thread),
+                onReplyTap: () => widget.onReplyTap(thread),
                 onShowRepliesTap: thread.hasReplies
                     ? () => widget.onExpandReplies(thread.id)
                     : null,
@@ -216,8 +223,8 @@ class _ThreadBranchBlockState extends State<ThreadBranchBlock> {
       return false;
     }
 
-    for (var i = 0; i < previous.length; i++) {
-      if ((previous[i] - next[i]).abs() > 0.5) {
+    for (var index = 0; index < previous.length; index++) {
+      if ((previous[index] - next[index]).abs() > 0.5) {
         return false;
       }
     }

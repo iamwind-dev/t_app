@@ -13,7 +13,7 @@ class CreatePostCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final content = Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      padding: const EdgeInsets.fromLTRB(0, 14, 0, 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

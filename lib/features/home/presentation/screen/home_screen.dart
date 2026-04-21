@@ -147,13 +147,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (isSearchTab)
                   SearchScreen(bottomPadding: _bottomSpace(context))
                 else if (isActivityTab)
-                  ActivityScreen(
-                    bottomPadding: _bottomSpace(context),
-                  )
+                  ActivityScreen(bottomPadding: _bottomSpace(context))
                 else if (isProfileTab)
-                  ProfileScreen(
-                    bottomPadding: _bottomSpace(context),
-                  )
+                  ProfileScreen(bottomPadding: _bottomSpace(context))
                 else
                   Column(
                     children: [
@@ -177,12 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                             final rootThread = state.rootThreads[index - 1];
                             return Padding(
-                              padding: const EdgeInsets.fromLTRB(
-                                16,
-                                14,
-                                16,
-                                16,
-                              ),
+                              padding: const EdgeInsets.fromLTRB(0, 14, 0, 16),
                               child: HomeThreadPreviewBlock(
                                 rootThread: rootThread,
                                 onRootTap: () => _openThreadDetail(rootThread),
