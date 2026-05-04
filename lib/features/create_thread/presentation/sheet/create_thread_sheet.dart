@@ -55,8 +55,13 @@ typedef ThreadComposerSubmitCallback =
 Future<void> showCreateThreadSheet({
   required BuildContext context,
   required User currentUser,
+  ThreadComposerSubmitCallback? onSubmit,
 }) {
-  return showThreadComposerSheet(context: context, currentUser: currentUser);
+  return showThreadComposerSheet(
+    context: context,
+    currentUser: currentUser,
+    onSubmit: onSubmit,
+  );
 }
 
 Future<void> showThreadComposerSheet({

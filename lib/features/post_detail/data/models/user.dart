@@ -6,6 +6,7 @@ class User extends Equatable {
     required this.name,
     required this.username,
     this.avatarAssetPath,
+    this.avatarUrl,
     this.subtitle,
     this.isVerified = false,
   });
@@ -14,6 +15,7 @@ class User extends Equatable {
   final String name;
   final String username;
   final String? avatarAssetPath;
+  final String? avatarUrl;
   final String? subtitle;
   final bool isVerified;
 
@@ -23,6 +25,7 @@ class User extends Equatable {
     name,
     username,
     avatarAssetPath,
+    avatarUrl,
     subtitle,
     isVerified,
   ];

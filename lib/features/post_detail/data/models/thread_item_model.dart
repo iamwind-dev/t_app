@@ -15,6 +15,7 @@ class ThreadItemModel extends Equatable {
     this.replyCount = 0,
     this.repostCount = 0,
     this.shareCount = 0,
+    this.isLikedByMe = false,
     this.replyPreviewAvatars = const [],
     this.previewReplies = const [],
     this.children = const [],
@@ -31,18 +32,17 @@ class ThreadItemModel extends Equatable {
   final int replyCount;
   final int repostCount;
   final int shareCount;
+  final bool isLikedByMe;
   final List<String> replyPreviewAvatars;
   final List<ThreadItemModel> previewReplies;
   final List<ThreadItemModel> children;
 
   bool get isRootThread => parentId == null;
-  bool get hasReplies => children.isNotEmpty;
-  ThreadItemModel? get previewReply =>
-      previewReplies.isNotEmpty
+  bool get hasReplies => replyCount > 0 || children.isNotEmpty;
+  ThreadItemModel? get previewReply => previewReplies.isNotEmpty
       ? previewReplies.first
       : (children.isNotEmpty ? children.first : null);
-  List<ThreadItemModel> get effectivePreviewReplies =>
-      previewReplies.isNotEmpty
+  List<ThreadItemModel> get effectivePreviewReplies => previewReplies.isNotEmpty
       ? previewReplies
       : children.take(2).toList(growable: false);
 
@@ -58,6 +58,7 @@ class ThreadItemModel extends Equatable {
     int? replyCount,
     int? repostCount,
     int? shareCount,
+    bool? isLikedByMe,
     List<String>? replyPreviewAvatars,
     List<ThreadItemModel>? previewReplies,
     List<ThreadItemModel>? children,
@@ -74,6 +75,7 @@ class ThreadItemModel extends Equatable {
       replyCount: replyCount ?? this.replyCount,
       repostCount: repostCount ?? this.repostCount,
       shareCount: shareCount ?? this.shareCount,
+      isLikedByMe: isLikedByMe ?? this.isLikedByMe,
       replyPreviewAvatars: replyPreviewAvatars ?? this.replyPreviewAvatars,
       previewReplies: previewReplies ?? this.previewReplies,
       children: children ?? this.children,
@@ -134,6 +136,7 @@ class ThreadItemModel extends Equatable {
     replyCount,
     repostCount,
     shareCount,
+    isLikedByMe,
     replyPreviewAvatars,
     previewReplies,
     children,

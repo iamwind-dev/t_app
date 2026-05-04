@@ -9,16 +9,17 @@ class HomeThreadPreviewBlock extends StatefulWidget {
     required this.onRootTap,
     required this.onReplyTap,
     required this.onPreviewReplyTap,
+    required this.onLikeTap,
   });
 
   final ThreadItemModel rootThread;
   final VoidCallback onRootTap;
   final VoidCallback onReplyTap;
   final ValueChanged<ThreadItemModel> onPreviewReplyTap;
+  final ValueChanged<ThreadItemModel> onLikeTap;
 
   @override
-  State<HomeThreadPreviewBlock> createState() =>
-      _HomeThreadPreviewBlockState();
+  State<HomeThreadPreviewBlock> createState() => _HomeThreadPreviewBlockState();
 }
 
 class _HomeThreadPreviewBlockState extends State<HomeThreadPreviewBlock> {
@@ -38,17 +39,13 @@ class _HomeThreadPreviewBlockState extends State<HomeThreadPreviewBlock> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _updateAvatarCenters(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateAvatarCenters());
   }
 
   @override
   void didUpdateWidget(covariant HomeThreadPreviewBlock oldWidget) {
     super.didUpdateWidget(oldWidget);
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _updateAvatarCenters(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateAvatarCenters());
   }
 
   @override
@@ -65,6 +62,7 @@ class _HomeThreadPreviewBlockState extends State<HomeThreadPreviewBlock> {
         thread: widget.rootThread,
         onTap: widget.onRootTap,
         onReplyTap: widget.onReplyTap,
+        onLikeTap: () => widget.onLikeTap(widget.rootThread),
         showReplyHint: false,
       );
     }
@@ -103,6 +101,7 @@ class _HomeThreadPreviewBlockState extends State<HomeThreadPreviewBlock> {
                 onReplyTap: isRootThread
                     ? widget.onReplyTap
                     : () => widget.onPreviewReplyTap(thread),
+                onLikeTap: () => widget.onLikeTap(thread),
                 showTimelineConnectors: false,
                 showReplyHint: false,
               ),
@@ -196,9 +195,7 @@ class _HomeThreadPreviewConnectorPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(
-    covariant _HomeThreadPreviewConnectorPainter oldDelegate,
-  ) {
+  bool shouldRepaint(covariant _HomeThreadPreviewConnectorPainter oldDelegate) {
     return oldDelegate.avatarCenters != avatarCenters ||
         oldDelegate.color != color ||
         oldDelegate.lineWidth != lineWidth ||

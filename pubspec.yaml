@@ -41,6 +41,9 @@ dependencies:
   get_it: ^8.2.0
   flutter_screenutil: ^5.9.0
   intl: ^0.20.2
+  flutter_secure_storage: ^10.0.0
+  image_picker: ^1.2.1
+  socket_io_client: ^3.1.4
 
 dev_dependencies:
   flutter_test:
@@ -73,6 +76,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/images/login/
     - assets/icons/
     - assets/icons/bottom/
     - assets/icons/search/

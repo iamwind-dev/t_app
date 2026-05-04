@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:t_app/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:t_app/features/create_thread/presentation/sheet/create_thread_sheet.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 import 'package:t_app/features/post_detail/data/models/user.dart';
+import 'package:t_app/features/post_detail/data/thread_tree_updater.dart';
 import 'package:t_app/features/post_detail/presentation/widget/thread_replies_section.dart';
+import 'package:t_app/features/posts/domain/posts_feed_repository.dart';
 
 class ThreadReplyScreen extends StatefulWidget {
   const ThreadReplyScreen({
@@ -21,18 +25,23 @@ class ThreadReplyScreen extends StatefulWidget {
 class _ThreadReplyScreenState extends State<ThreadReplyScreen> {
   late ThreadItemModel _rootThread;
   late final Set<String> _expandedThreadIds;
+  late final PostsFeedRepository _postsRepository;
 
-  User get _currentUser => const User(
-    id: 'current_user',
-    name: '__win.d',
-    username: '__win.d',
-    avatarAssetPath: 'assets/images/home_avatar_payal.png',
-  );
+  User get _currentUser {
+    final authUser = context.read<AuthCubit>().state.user;
+    return User(
+      id: authUser?.id ?? 'current_user',
+      name: authUser?.displayName ?? '__win.d',
+      username: authUser?.username ?? '__win.d',
+      avatarUrl: authUser?.avatarUrl,
+    );
+  }
 
   @override
   void initState() {
     super.initState();
     _rootThread = widget.rootThread;
+    _postsRepository = context.read<PostsFeedRepository>();
     final branchPath = _rootThread.buildAncestorPath(widget.selectedThreadId);
     final selectedThread = _rootThread.findById(widget.selectedThreadId);
     _expandedThreadIds = _buildInitialExpandedThreadIds(
@@ -42,14 +51,40 @@ class _ThreadReplyScreenState extends State<ThreadReplyScreen> {
   }
 
   /// Expands one reply node so the next level in the branch becomes visible.
-  void _expandReplies(String threadId) {
-    if (_expandedThreadIds.contains(threadId)) {
+  Future<void> _expandReplies(ThreadItemModel thread) async {
+    if (_expandedThreadIds.contains(thread.id)) {
       return;
     }
 
-    setState(() {
-      _expandedThreadIds.add(threadId);
-    });
+    if (thread.children.isNotEmpty || thread.replyCount == 0) {
+      setState(() {
+        _expandedThreadIds.add(thread.id);
+      });
+      return;
+    }
+
+    try {
+      final children = await _postsRepository.getReplyChildren(thread.id);
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _rootThread = ThreadTreeUpdater.attachChildren(
+          root: _rootThread,
+          parentId: thread.id,
+          children: children.items,
+        );
+        _expandedThreadIds.add(thread.id);
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to load replies.')),
+      );
+    }
   }
 
   /// Opens another branch screen focused on the tapped related reply.
@@ -80,14 +115,15 @@ class _ThreadReplyScreenState extends State<ThreadReplyScreen> {
           return;
         }
 
-        final newReply = ThreadItemModel(
-          id: 'reply_${DateTime.now().microsecondsSinceEpoch}',
-          parentId: targetThread.id,
-          rootThreadId: _rootThread.rootThreadId,
-          author: _currentUser,
-          createdAt: 'Vua xong',
-          content: request.primaryContent,
-        );
+        final newReply = targetThread.id == _rootThread.id
+            ? await _postsRepository.createPostReply(
+                postId: _rootThread.id,
+                content: request.primaryContent,
+              )
+            : await _postsRepository.createChildReply(
+                replyId: targetThread.id,
+                content: request.primaryContent,
+              );
 
         if (!mounted) {
           return;
@@ -103,6 +139,32 @@ class _ThreadReplyScreenState extends State<ThreadReplyScreen> {
         });
       },
     );
+  }
+
+  Future<void> _toggleLike(ThreadItemModel thread) async {
+    final isRootPost = thread.id == _rootThread.id;
+    final result = isRootPost
+        ? (thread.isLikedByMe
+              ? await _postsRepository.unlikePost(thread.id)
+              : await _postsRepository.likePost(thread.id))
+        : (thread.isLikedByMe
+              ? await _postsRepository.unlikeReply(thread.id)
+              : await _postsRepository.likeReply(thread.id));
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _rootThread = _replaceThread(
+        current: _rootThread,
+        targetId: result.targetId,
+        update: (target) => target.copyWith(
+          likesCount: result.likeCount,
+          isLikedByMe: result.isLiked,
+        ),
+      );
+    });
   }
 
   /// Inserts a direct child reply and updates only the target node count.
@@ -129,6 +191,28 @@ class _ThreadReplyScreenState extends State<ThreadReplyScreen> {
               current: child,
               targetId: targetId,
               newReply: newReply,
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+
+  ThreadItemModel _replaceThread({
+    required ThreadItemModel current,
+    required String targetId,
+    required ThreadItemModel Function(ThreadItemModel target) update,
+  }) {
+    if (current.id == targetId) {
+      return update(current);
+    }
+
+    return current.copyWith(
+      children: current.children
+          .map(
+            (child) => _replaceThread(
+              current: child,
+              targetId: targetId,
+              update: update,
             ),
           )
           .toList(growable: false),
@@ -163,6 +247,7 @@ class _ThreadReplyScreenState extends State<ThreadReplyScreen> {
                       highlightedThreadId: widget.selectedThreadId,
                       onThreadTap: _openThreadBranch,
                       onReplyTap: _openReplyComposer,
+                      onLikeTap: _toggleLike,
                       onExpandReplies: _expandReplies,
                     ),
                   ),

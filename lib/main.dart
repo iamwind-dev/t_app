@@ -1,23 +1,74 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'core/config/app_config.dart';
+import 'core/network/api_client.dart';
+import 'core/network/api_token_store.dart';
+import 'core/network/secure_api_token_store.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/system_ui_helper.dart';
 import 'core/theme/theme_mode_cubit.dart';
 import 'core/theme/theme_mode_storage.dart';
+import 'features/activity/data/notifications_repository.dart';
+import 'features/activity/domain/notifications_activity_repository.dart';
+import 'features/auth/data/auth_repository.dart';
+import 'features/auth/domain/auth_session_repository.dart';
+import 'features/auth/presentation/cubit/auth_cubit.dart';
+import 'features/auth/presentation/cubit/auth_state.dart';
+import 'features/auth/presentation/screen/login_screen.dart';
+import 'features/chat/data/backend_chat_repository.dart';
+import 'features/chat/data/chat_socket_service.dart';
+import 'features/chat/data/socket_io_chat_realtime_client.dart';
+import 'features/chat/domain/chat_repository.dart';
 import 'features/home/presentation/cubits/home_cubit.dart';
 import 'features/home/presentation/screen/home_screen.dart';
+import 'features/posts/data/posts_repository.dart';
+import 'features/posts/domain/posts_feed_repository.dart';
+import 'features/uploads/data/uploads_repository.dart';
+import 'features/uploads/domain/uploads_image_repository.dart';
+import 'features/users/data/users_repository.dart';
+import 'features/users/domain/users_profile_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final themeModeStorage = ThemeModeStorage();
   final initialThemeMode = await themeModeStorage.load();
+  const tokenStore = SecureApiTokenStore();
+  final apiClient = ApiClient(
+    dio: Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl)),
+    tokenStore: tokenStore,
+  );
+  final authRepository = AuthRepository(
+    apiClient: apiClient,
+    tokenStore: tokenStore,
+  );
+  final usersRepository = UsersRepository(apiClient: apiClient);
+  final postsRepository = PostsRepository(apiClient: apiClient);
+  final uploadsRepository = UploadsRepository(apiClient: apiClient);
+  final notificationsRepository = NotificationsRepository(apiClient: apiClient);
+  final chatSocketService = SocketIoChatRealtimeClient(
+    baseUrl: AppConfig.apiBaseUrl,
+    tokenStore: tokenStore,
+  );
+  final chatRepository = BackendChatRepository(
+    apiClient: apiClient,
+    realtimeClient: chatSocketService,
+  );
 
   runApp(
     TogetherApp(
       themeModeStorage: themeModeStorage,
       initialThemeMode: initialThemeMode,
+      tokenStore: tokenStore,
+      authRepository: authRepository,
+      usersRepository: usersRepository,
+      postsRepository: postsRepository,
+      uploadsRepository: uploadsRepository,
+      notificationsRepository: notificationsRepository,
+      chatRepository: chatRepository,
+      chatSocketService: chatSocketService,
     ),
   );
 }
@@ -27,40 +78,100 @@ class TogetherApp extends StatelessWidget {
     super.key,
     required this.themeModeStorage,
     required this.initialThemeMode,
+    required this.tokenStore,
+    required this.authRepository,
+    required this.usersRepository,
+    required this.postsRepository,
+    required this.uploadsRepository,
+    required this.notificationsRepository,
+    required this.chatRepository,
+    required this.chatSocketService,
   });
 
   final ThemeModeStorage themeModeStorage;
   final ThemeMode initialThemeMode;
+  final ApiTokenStore tokenStore;
+  final AuthSessionRepository authRepository;
+  final UsersProfileRepository usersRepository;
+  final PostsFeedRepository postsRepository;
+  final UploadsImageRepository uploadsRepository;
+  final NotificationsActivityRepository notificationsRepository;
+  final ChatRepository chatRepository;
+  final ChatSocketService chatSocketService;
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
+    return MultiRepositoryProvider(
       providers: [
-        BlocProvider(
-          create: (_) => ThemeModeCubit(
-            initialThemeMode: initialThemeMode,
-            storage: themeModeStorage,
-          ),
+        RepositoryProvider<ApiTokenStore>.value(value: tokenStore),
+        RepositoryProvider<AuthSessionRepository>.value(value: authRepository),
+        RepositoryProvider<UsersProfileRepository>.value(
+          value: usersRepository,
         ),
-        BlocProvider(create: (_) => HomeCubit()),
+        RepositoryProvider<PostsFeedRepository>.value(value: postsRepository),
+        RepositoryProvider<UploadsImageRepository>.value(
+          value: uploadsRepository,
+        ),
+        RepositoryProvider<NotificationsActivityRepository>.value(
+          value: notificationsRepository,
+        ),
+        RepositoryProvider<ChatRepository>.value(value: chatRepository),
+        RepositoryProvider<ChatSocketService>.value(value: chatSocketService),
       ],
-      child: BlocBuilder<ThemeModeCubit, ThemeMode>(
-        builder: (context, themeMode) {
-          return MaterialApp(
-            title: 'Together',
-            debugShowCheckedModeBanner: false,
-            themeMode: themeMode,
-            theme: AppTheme.light(),
-            darkTheme: AppTheme.dark(),
-            builder: (context, child) {
-              return _SystemUiOverlaySync(
-                child: child ?? const SizedBox.shrink(),
-              );
-            },
-            home: const HomeScreen(),
-          );
-        },
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider(
+            create: (_) => ThemeModeCubit(
+              initialThemeMode: initialThemeMode,
+              storage: themeModeStorage,
+            ),
+          ),
+          BlocProvider(
+            create: (_) =>
+                AuthCubit(repository: authRepository)..checkSession(),
+          ),
+          BlocProvider(
+            create: (_) =>
+                HomeCubit(repository: postsRepository)..loadHomeFeed(),
+          ),
+        ],
+        child: BlocBuilder<ThemeModeCubit, ThemeMode>(
+          builder: (context, themeMode) {
+            return MaterialApp(
+              title: 'Together',
+              debugShowCheckedModeBanner: false,
+              themeMode: themeMode,
+              theme: AppTheme.light(),
+              darkTheme: AppTheme.dark(),
+              builder: (context, child) {
+                return _SystemUiOverlaySync(
+                  child: child ?? const SizedBox.shrink(),
+                );
+              },
+              home: const _AuthGate(),
+            );
+          },
+        ),
       ),
+    );
+  }
+}
+
+class _AuthGate extends StatelessWidget {
+  const _AuthGate();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<AuthCubit, AuthState>(
+      builder: (context, state) {
+        return switch (state.status) {
+          AuthStatus.checking => const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          ),
+          AuthStatus.authenticated => const HomeScreen(),
+          _ => const LoginScreen(),
+        };
+      },
     );
   }
 }

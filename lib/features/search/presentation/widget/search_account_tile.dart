@@ -1,22 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:t_app/features/users/presentation/widgets/user_avatar_button.dart';
+import 'package:t_app/features/users/presentation/widgets/user_name_button.dart';
 
 import '../theme/search_tokens.dart';
 
 @immutable
 class SearchAccountItem {
   const SearchAccountItem({
+    required this.userId,
     required this.handle,
     required this.subtitle,
     required this.followers,
+    required this.isFollowing,
+    this.avatarUrl,
     this.mutualFollowersAsset,
     this.topPadding = SearchTokens.tileVerticalPadding,
     this.bottomPadding = SearchTokens.tileVerticalPadding,
   });
 
+  final String userId;
   final String handle;
   final String subtitle;
   final String followers;
+  final bool isFollowing;
+  final String? avatarUrl;
   final String? mutualFollowersAsset;
   final double topPadding;
   final double bottomPadding;
@@ -30,9 +38,10 @@ class SearchAccountItem {
 }
 
 class SearchAccountTile extends StatelessWidget {
-  const SearchAccountTile({super.key, required this.item});
+  const SearchAccountTile({super.key, required this.item, this.onFollowTap});
 
   final SearchAccountItem item;
+  final VoidCallback? onFollowTap;
 
   @override
   Widget build(BuildContext context) {
@@ -48,18 +57,12 @@ class SearchAccountTile extends StatelessWidget {
             height: SearchTokens.avatarSlotHeight,
             child: Align(
               alignment: Alignment.topCenter,
-              child: Container(
-                width: SearchTokens.avatarSize,
-                height: SearchTokens.avatarSize,
-                decoration: BoxDecoration(
-                  color: SearchTokens.avatarLetterBackground(context),
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  item.avatarLetter,
-                  style: SearchTokens.avatarLetter(context),
-                ),
+              child: UserAvatarButton(
+                userId: item.userId,
+                avatarUrl: item.avatarUrl,
+                displayName: item.subtitle,
+                username: item.handle,
+                size: SearchTokens.avatarSize,
               ),
             ),
           ),
@@ -82,7 +85,7 @@ class SearchAccountTile extends StatelessWidget {
                 children: [
                   Expanded(child: _AccountMeta(item: item)),
                   const SizedBox(width: SearchTokens.rowGap),
-                  const _FollowButton(),
+                  _FollowButton(item: item, onTap: onFollowTap),
                 ],
               ),
             ),
@@ -106,10 +109,9 @@ class _AccountMeta extends StatelessWidget {
         Row(
           children: [
             Flexible(
-              child: Text(
-                item.handle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              child: UserNameButton(
+                userId: item.userId,
+                label: item.handle,
                 style: SearchTokens.handle(context),
               ),
             ),
@@ -152,21 +154,34 @@ class _AccountMeta extends StatelessWidget {
 }
 
 class _FollowButton extends StatelessWidget {
-  const _FollowButton();
+  const _FollowButton({required this.item, required this.onTap});
+
+  final SearchAccountItem item;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: SearchTokens.followBorderRadius,
-        border: Border.all(color: SearchTokens.borderFollow(context)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: SearchTokens.followHorizontalPadding,
-          vertical: SearchTokens.followVerticalPadding,
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: SearchTokens.followBorderRadius,
+          border: Border.all(color: SearchTokens.borderFollow(context)),
+          color: item.isFollowing
+              ? Theme.of(context).colorScheme.surfaceContainerHigh
+              : null,
         ),
-        child: Text('Follow', style: SearchTokens.follow(context)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: SearchTokens.followHorizontalPadding,
+            vertical: SearchTokens.followVerticalPadding,
+          ),
+          child: Text(
+            item.isFollowing ? 'Following' : 'Follow',
+            style: SearchTokens.follow(context),
+          ),
+        ),
       ),
     );
   }

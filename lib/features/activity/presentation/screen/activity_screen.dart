@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:t_app/features/activity/data/mock_activity_data.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:t_app/features/activity/data/models/activity_item_model.dart';
+import 'package:t_app/features/activity/domain/notifications_activity_repository.dart';
+import 'package:t_app/features/activity/presentation/cubit/activity_cubit.dart';
+import 'package:t_app/features/activity/presentation/cubit/activity_state.dart';
 import 'package:t_app/features/home/presentation/widget/post_divider.dart';
 import 'package:t_app/features/post_detail/presentation/screen/thread_detail_screen.dart';
-import 'package:t_app/features/post_detail/presentation/widget/avatar_view.dart';
 import 'package:t_app/features/post_detail/presentation/widget/thread_item_widget.dart';
+import 'package:t_app/features/users/domain/users_profile_repository.dart';
+import 'package:t_app/features/users/presentation/widgets/user_avatar_button.dart';
+import 'package:t_app/features/users/presentation/widgets/user_name_button.dart';
 
 class ActivityScreen extends StatefulWidget {
-  const ActivityScreen({
-    super.key,
-    required this.bottomPadding,
-  });
+  const ActivityScreen({super.key, required this.bottomPadding});
 
   final double bottomPadding;
 
@@ -20,38 +22,37 @@ class ActivityScreen extends StatefulWidget {
 
 class _ActivityScreenState extends State<ActivityScreen> {
   late ActivityFilter _activeFilter;
-  late List<ActivityItemModel> _items;
+  late final ActivityCubit _activityCubit;
 
   @override
   void initState() {
     super.initState();
     _activeFilter = ActivityFilter.all;
-    _items = activityItems;
+    _activityCubit = ActivityCubit(
+      notificationsRepository: context.read<NotificationsActivityRepository>(),
+      usersRepository: context.read<UsersProfileRepository>(),
+    )..loadNotifications();
   }
 
-  void _toggleFollow(String itemId) {
-    setState(() {
-      _items = _items
-          .map(
-            (item) => item.id == itemId
-                ? item.copyWith(isFollowed: !item.isFollowed)
-                : item,
-          )
-          .toList(growable: false);
-    });
+  @override
+  void dispose() {
+    _activityCubit.close();
+    super.dispose();
   }
 
-  List<ActivityItemModel> get _filteredItems {
+  List<ActivityItemModel> _filteredItems(List<ActivityItemModel> items) {
     switch (_activeFilter) {
       case ActivityFilter.all:
-        return _items;
+        return items;
       case ActivityFilter.follows:
-        return _items
+        return items
             .where((item) => item.type == ActivityItemType.followSuggestion)
             .toList(growable: false);
       case ActivityFilter.conversations:
-        return _items
-            .where((item) => item.type == ActivityItemType.contentRecommendation)
+        return items
+            .where(
+              (item) => item.type == ActivityItemType.contentRecommendation,
+            )
             .toList(growable: false);
     }
   }
@@ -70,46 +71,87 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final items = _filteredItems;
+    return BlocBuilder<ActivityCubit, ActivityState>(
+      bloc: _activityCubit,
+      builder: (context, state) {
+        final items = _filteredItems(state.items);
 
-    return ListView.separated(
-      padding: EdgeInsets.only(
-        top: 18,
-        bottom: widget.bottomPadding,
-      ),
-      itemCount: items.length + 2,
-      separatorBuilder: (_, index) =>
-          index < 2 ? const SizedBox.shrink() : const PostDivider(),
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return ActivityHeader(
-            activeFilter: _activeFilter,
-            onFilterChanged: (filter) {
-              setState(() {
-                _activeFilter = filter;
-              });
-            },
-          );
-        }
+        return ListView.separated(
+          padding: EdgeInsets.only(top: 18, bottom: widget.bottomPadding),
+          itemCount: items.length + 2,
+          separatorBuilder: (_, index) =>
+              index < 2 ? const SizedBox.shrink() : const PostDivider(),
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return ActivityHeader(
+                activeFilter: _activeFilter,
+                onFilterChanged: (filter) {
+                  setState(() {
+                    _activeFilter = filter;
+                  });
+                },
+              );
+            }
 
-        if (index == 1) {
-          return const SizedBox(height: 8);
-        }
+            if (index == 1) {
+              if (state.status == ActivityStatus.loading) {
+                return const Padding(
+                  padding: EdgeInsets.only(top: 36),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
 
-        final item = items[index - 2];
-        switch (item.type) {
-          case ActivityItemType.followSuggestion:
-            return FollowSuggestionActivityItem(
-              item: item,
-              onFollowTap: () => _toggleFollow(item.id),
-            );
-          case ActivityItemType.contentRecommendation:
-            return ContentRecommendationActivityItem(
-              item: item,
-              onTap: () => _openThread(item),
-            );
-        }
+              if (state.status == ActivityStatus.failure) {
+                return _ActivityMessage(
+                  message: state.errorMessage ?? 'Unable to load activity.',
+                );
+              }
+
+              if (items.isEmpty) {
+                return const _ActivityMessage(
+                  message: 'Chưa có hoạt động nào.',
+                );
+              }
+
+              return const SizedBox(height: 8);
+            }
+
+            final item = items[index - 2];
+            switch (item.type) {
+              case ActivityItemType.followSuggestion:
+                return FollowSuggestionActivityItem(
+                  item: item,
+                  onFollowTap: () => _activityCubit.toggleFollow(item),
+                );
+              case ActivityItemType.contentRecommendation:
+                return ContentRecommendationActivityItem(
+                  item: item,
+                  onTap: () => _openThread(item),
+                );
+            }
+          },
+        );
       },
+    );
+  }
+}
+
+class _ActivityMessage extends StatelessWidget {
+  const _ActivityMessage({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 48, 24, 0),
+      child: Text(
+        message,
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        textAlign: TextAlign.center,
+      ),
     );
   }
 }
@@ -172,41 +214,45 @@ class ActivityFilterChips extends StatelessWidget {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: _entries.map((entry) {
-          final isActive = activeFilter == entry.$1;
-          return Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: GestureDetector(
-              onTap: () => onChanged(entry.$1),
-              behavior: HitTestBehavior.opaque,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: isActive
-                      ? colorScheme.surfaceContainerHigh
-                      : colorScheme.surface,
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+        children: _entries
+            .map((entry) {
+              final isActive = activeFilter == entry.$1;
+              return Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: GestureDetector(
+                  onTap: () => onChanged(entry.$1),
+                  behavior: HitTestBehavior.opaque,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? colorScheme.surfaceContainerHigh
+                          : colorScheme.surface,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: colorScheme.outlineVariant.withValues(
+                          alpha: 0.45,
+                        ),
+                      ),
+                    ),
+                    child: Text(
+                      entry.$2,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: isActive
+                            ? colorScheme.onSurface
+                            : colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
                 ),
-                child: Text(
-                  entry.$2,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: isActive
-                        ? colorScheme.onSurface
-                        : colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).toList(growable: false),
+              );
+            })
+            .toList(growable: false),
       ),
     );
   }
@@ -231,10 +277,7 @@ class FollowSuggestionActivityItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _ActivityAvatar(
-            item: item,
-            radius: 22,
-          ),
+          _ActivityAvatar(item: item, radius: 22),
           const SizedBox(width: 14),
           Expanded(
             child: Padding(
@@ -245,12 +288,14 @@ class FollowSuggestionActivityItem extends StatelessWidget {
                   Row(
                     children: [
                       Flexible(
-                        child: Text(
-                          item.user.username,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: colorScheme.onSurface,
-                          ),
+                        child: UserNameButton(
+                          userId: item.user.id,
+                          label: item.user.username,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.onSurface,
+                              ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -274,10 +319,7 @@ class FollowSuggestionActivityItem extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          _FollowButton(
-            isFollowed: item.isFollowed,
-            onTap: onFollowTap,
-          ),
+          _FollowButton(isFollowed: item.isFollowed, onTap: onFollowTap),
         ],
       ),
     );
@@ -305,10 +347,7 @@ class ContentRecommendationActivityItem extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _ActivityAvatar(
-              item: item,
-              radius: 22,
-            ),
+            _ActivityAvatar(item: item, radius: 22),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -324,38 +363,45 @@ class ContentRecommendationActivityItem extends StatelessWidget {
                             Row(
                               children: [
                                 Flexible(
-                                  child: Text(
-                                    item.user.username,
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                      color: colorScheme.onSurface,
-                                    ),
+                                  child: UserNameButton(
+                                    userId: item.user.id,
+                                    label: item.user.username,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: colorScheme.onSurface,
+                                        ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
                                   item.timestampLabel,
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 6),
                             Text(
                               item.subtitle,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
                             ),
                             if (item.contentPreview != null) ...[
                               const SizedBox(height: 6),
                               Text(
                                 item.contentPreview!,
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  height: 1.35,
-                                  color: colorScheme.onSurface,
-                                ),
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      height: 1.35,
+                                      color: colorScheme.onSurface,
+                                    ),
                               ),
                             ],
                           ],
@@ -384,11 +430,10 @@ class ContentRecommendationActivityItem extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
-                  ThreadActionsRow(
-                    thread: item.thread!,
-                    onReplyTap: onTap,
-                  ),
+                  if (item.thread != null) ...[
+                    const SizedBox(height: 14),
+                    ThreadActionsRow(thread: item.thread!, onReplyTap: onTap),
+                  ],
                 ],
               ),
             ),
@@ -400,10 +445,7 @@ class ContentRecommendationActivityItem extends StatelessWidget {
 }
 
 class _ActivityAvatar extends StatelessWidget {
-  const _ActivityAvatar({
-    required this.item,
-    required this.radius,
-  });
+  const _ActivityAvatar({required this.item, required this.radius});
 
   final ActivityItemModel item;
   final double radius;
@@ -413,7 +455,14 @@ class _ActivityAvatar extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        AvatarView(user: item.user, radius: radius),
+        UserAvatarButton(
+          userId: item.user.id,
+          avatarUrl: item.user.avatarUrl,
+          avatarAssetPath: item.user.avatarAssetPath,
+          displayName: item.user.name,
+          username: item.user.username,
+          size: radius * 2,
+        ),
         if (item.hasPurpleBadge)
           Positioned(
             right: -2,
@@ -442,10 +491,7 @@ class _ActivityAvatar extends StatelessWidget {
 }
 
 class _FollowButton extends StatelessWidget {
-  const _FollowButton({
-    required this.isFollowed,
-    required this.onTap,
-  });
+  const _FollowButton({required this.isFollowed, required this.onTap});
 
   final bool isFollowed;
   final VoidCallback onTap;

@@ -8,31 +8,25 @@ class ThreadRepliesSection extends StatefulWidget {
   const ThreadRepliesSection({
     super.key,
     required this.rootThread,
+    required this.expandedThreadIds,
     required this.onThreadTap,
     required this.onReplyTap,
+    required this.onLikeTap,
+    required this.onExpandReplies,
   });
 
   final ThreadItemModel rootThread;
+  final Set<String> expandedThreadIds;
   final ValueChanged<ThreadItemModel> onThreadTap;
   final ValueChanged<ThreadItemModel> onReplyTap;
+  final ValueChanged<ThreadItemModel> onLikeTap;
+  final ValueChanged<ThreadItemModel> onExpandReplies;
 
   @override
   State<ThreadRepliesSection> createState() => _ThreadRepliesSectionState();
 }
 
 class _ThreadRepliesSectionState extends State<ThreadRepliesSection> {
-  final Set<String> _expandedThreadIds = <String>{};
-
-  void _expandReplies(String threadId) {
-    if (_expandedThreadIds.contains(threadId)) {
-      return;
-    }
-
-    setState(() {
-      _expandedThreadIds.add(threadId);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final rootReplies = widget.rootThread.children;
@@ -61,10 +55,11 @@ class _ThreadRepliesSectionState extends State<ThreadRepliesSection> {
             padding: const EdgeInsets.fromLTRB(0, 12, 0, 12),
             child: ThreadBranchBlock(
               rootReply: rootReplies[index],
-              expandedThreadIds: _expandedThreadIds,
+              expandedThreadIds: widget.expandedThreadIds,
               onThreadTap: widget.onThreadTap,
               onReplyTap: widget.onReplyTap,
-              onExpandReplies: _expandReplies,
+              onLikeTap: widget.onLikeTap,
+              onExpandReplies: widget.onExpandReplies,
             ),
           ),
           if (index != rootReplies.length - 1) const PostDivider(),
@@ -81,6 +76,7 @@ class ThreadBranchBlock extends StatefulWidget {
     required this.expandedThreadIds,
     required this.onThreadTap,
     required this.onReplyTap,
+    required this.onLikeTap,
     required this.onExpandReplies,
     this.highlightedThreadId,
   });
@@ -89,7 +85,8 @@ class ThreadBranchBlock extends StatefulWidget {
   final Set<String> expandedThreadIds;
   final ValueChanged<ThreadItemModel> onThreadTap;
   final ValueChanged<ThreadItemModel> onReplyTap;
-  final ValueChanged<String> onExpandReplies;
+  final ValueChanged<ThreadItemModel> onLikeTap;
+  final ValueChanged<ThreadItemModel> onExpandReplies;
   final String? highlightedThreadId;
 
   @override
@@ -154,8 +151,9 @@ class _ThreadBranchBlockState extends State<ThreadBranchBlock> {
                 thread: thread,
                 onTap: () => widget.onThreadTap(thread),
                 onReplyTap: () => widget.onReplyTap(thread),
+                onLikeTap: () => widget.onLikeTap(thread),
                 onShowRepliesTap: thread.hasReplies
-                    ? () => widget.onExpandReplies(thread.id)
+                    ? () => widget.onExpandReplies(thread)
                     : null,
                 showTimelineConnectors: false,
                 showReplyHint: thread.hasReplies,

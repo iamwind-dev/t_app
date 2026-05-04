@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:t_app/core/theme/app_icon_tokens.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
+import 'package:t_app/features/users/presentation/widgets/user_avatar_button.dart';
+import 'package:t_app/features/users/presentation/widgets/user_name_button.dart';
 
-import 'avatar_view.dart';
 import 'thread_media_section.dart';
 
 class ThreadItemWidget extends StatelessWidget {
@@ -136,10 +137,9 @@ class ThreadHeader extends StatelessWidget {
     return Row(
       children: [
         Flexible(
-          child: Text(
-            thread.author.username,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          child: UserNameButton(
+            userId: thread.author.id,
+            label: thread.author.username,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w700,
               color: colorScheme.onSurface,
@@ -241,7 +241,14 @@ class _ThreadAvatar extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        AvatarView(user: thread.author, radius: ThreadItemWidget.avatarRadius),
+        UserAvatarButton(
+          userId: thread.author.id,
+          avatarUrl: thread.author.avatarUrl,
+          avatarAssetPath: thread.author.avatarAssetPath,
+          displayName: thread.author.name,
+          username: thread.author.username,
+          size: ThreadItemWidget.avatarRadius * 2,
+        ),
         Positioned(
           right: -2,
           bottom: -2,
@@ -327,6 +334,7 @@ class ThreadActionsRow extends StatelessWidget {
           count: '${thread.likesCount}',
           alwaysShowCount: true,
           enableLikeToggle: true,
+          initiallyLiked: thread.isLikedByMe,
           onTap: onLikeTap,
         ),
         const SizedBox(width: 18),
@@ -385,6 +393,7 @@ class _ThreadActionWithCount extends StatefulWidget {
     required this.count,
     this.alwaysShowCount = false,
     this.enableLikeToggle = false,
+    this.initiallyLiked = false,
     this.activeIconAssetPath,
     this.onTap,
   });
@@ -394,6 +403,7 @@ class _ThreadActionWithCount extends StatefulWidget {
   final String count;
   final bool alwaysShowCount;
   final bool enableLikeToggle;
+  final bool initiallyLiked;
   final VoidCallback? onTap;
 
   @override
@@ -426,7 +436,7 @@ class _ThreadActionWithCountState extends State<_ThreadActionWithCount>
   void initState() {
     super.initState();
     _displayCount = widget.count;
-    _isLiked = false;
+    _isLiked = widget.initiallyLiked;
     _countController =
         AnimationController(
           vsync: this,
@@ -446,8 +456,10 @@ class _ThreadActionWithCountState extends State<_ThreadActionWithCount>
     if (oldWidget.count != widget.count) {
       _displayCount = widget.count;
       _previousCount = null;
-      _isLiked = false;
+      _isLiked = widget.initiallyLiked;
       _countDirection = _directionUp;
+    } else if (oldWidget.initiallyLiked != widget.initiallyLiked) {
+      _isLiked = widget.initiallyLiked;
     }
   }
 

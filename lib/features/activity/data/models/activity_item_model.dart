@@ -2,16 +2,9 @@ import 'package:equatable/equatable.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 import 'package:t_app/features/post_detail/data/models/user.dart';
 
-enum ActivityItemType {
-  followSuggestion,
-  contentRecommendation,
-}
+enum ActivityItemType { followSuggestion, contentRecommendation }
 
-enum ActivityFilter {
-  all,
-  follows,
-  conversations,
-}
+enum ActivityFilter { all, follows, conversations }
 
 class ActivityItemModel extends Equatable {
   const ActivityItemModel({
@@ -28,6 +21,9 @@ class ActivityItemModel extends Equatable {
     this.repostCount = 0,
     this.shareCount = 0,
     this.isFollowed = false,
+    this.isRead = false,
+    this.targetType,
+    this.targetId,
     this.thread,
   });
 
@@ -44,6 +40,9 @@ class ActivityItemModel extends Equatable {
   final int repostCount;
   final int shareCount;
   final bool isFollowed;
+  final bool isRead;
+  final String? targetType;
+  final String? targetId;
   final ThreadItemModel? thread;
 
   ActivityItemModel copyWith({
@@ -60,6 +59,9 @@ class ActivityItemModel extends Equatable {
     int? repostCount,
     int? shareCount,
     bool? isFollowed,
+    bool? isRead,
+    String? targetType,
+    String? targetId,
     ThreadItemModel? thread,
   }) {
     return ActivityItemModel(
@@ -76,6 +78,9 @@ class ActivityItemModel extends Equatable {
       repostCount: repostCount ?? this.repostCount,
       shareCount: shareCount ?? this.shareCount,
       isFollowed: isFollowed ?? this.isFollowed,
+      isRead: isRead ?? this.isRead,
+      targetType: targetType ?? this.targetType,
+      targetId: targetId ?? this.targetId,
       thread: thread ?? this.thread,
     );
   }
@@ -95,6 +100,9 @@ class ActivityItemModel extends Equatable {
     repostCount,
     shareCount,
     isFollowed,
+    isRead,
+    targetType,
+    targetId,
     thread,
   ];
 }

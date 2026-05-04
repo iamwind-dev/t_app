@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:t_app/features/activity/presentation/screen/activity_screen.dart';
 import 'package:t_app/core/theme/theme_mode_cubit.dart';
 import 'package:t_app/core/widget/home_bottom_tab_bar.dart';
+import 'package:t_app/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:t_app/features/chat/presentation/screen/chat_inbox_screen.dart';
 import 'package:t_app/features/create_thread/presentation/sheet/create_thread_sheet.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 import 'package:t_app/features/post_detail/data/models/user.dart';
@@ -33,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isBottomBarVisible = true;
   bool _isHeaderCompact = false;
   double _lastOffset = 0;
+  bool _isChatOpen = false;
 
   @override
   void initState() {
@@ -79,11 +82,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   User _buildCurrentUser(HomeState state) {
+    final authUser = context.read<AuthCubit>().state.user;
     return User(
-      id: 'current_user',
-      name: state.currentUser.username,
-      username: state.currentUser.username,
-      avatarAssetPath: state.currentUser.avatarAsset,
+      id: authUser?.id ?? 'current_user',
+      name: authUser?.displayName ?? state.currentUser.username,
+      username: authUser?.username ?? state.currentUser.username,
+      avatarUrl: authUser?.avatarUrl,
+      avatarAssetPath: authUser?.avatarUrl == null
+          ? state.currentUser.avatarAsset
+          : null,
     );
   }
 
@@ -91,10 +98,16 @@ class _HomeScreenState extends State<HomeScreen> {
     return showCreateThreadSheet(
       context: context,
       currentUser: _buildCurrentUser(state),
+      onSubmit: (request) =>
+          context.read<HomeCubit>().createPost(request.primaryContent),
     );
   }
 
   void _handleBottomTabTap(int index, HomeState state) {
+    if (_isChatOpen) {
+      setState(() => _isChatOpen = false);
+    }
+
     if (index == 2) {
       _openCreateThreadSheet(state);
       return;
@@ -130,6 +143,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final selectedThemeMode = context.select(
       (ThemeModeCubit cubit) => cubit.state,
     );
+    final currentUser = context.select((AuthCubit cubit) => cubit.state.user);
 
     return BlocBuilder<HomeCubit, HomeState>(
       builder: (context, state) {
@@ -137,98 +151,165 @@ class _HomeScreenState extends State<HomeScreen> {
         final isActivityTab = state.selectedTabIndex == 3;
         final isProfileTab = state.selectedTabIndex == 4;
         final shouldShowBottomBar =
-            isSearchTab || isActivityTab || isProfileTab || _isBottomBarVisible;
+            _isChatOpen ||
+            isSearchTab ||
+            isActivityTab ||
+            isProfileTab ||
+            _isBottomBarVisible;
 
-        return Scaffold(
-          body: SafeArea(
-            bottom: false,
-            child: Stack(
-              children: [
-                if (isSearchTab)
-                  SearchScreen(bottomPadding: _bottomSpace(context))
-                else if (isActivityTab)
-                  ActivityScreen(bottomPadding: _bottomSpace(context))
-                else if (isProfileTab)
-                  ProfileScreen(bottomPadding: _bottomSpace(context))
-                else
-                  Column(
-                    children: [
-                      HomeHeader(isCompact: _isHeaderCompact),
-                      Expanded(
-                        child: ListView.separated(
-                          controller: _scrollController,
-                          padding: EdgeInsets.only(
-                            bottom: shouldShowBottomBar
-                                ? _bottomSpace(context)
-                                : 12,
-                          ),
-                          itemCount: state.rootThreads.length + 1,
-                          itemBuilder: (context, index) {
-                            if (index == 0) {
-                              return CreatePostCard(
-                                currentUser: state.currentUser,
-                                onTap: () => _openCreateThreadSheet(state),
+        return PopScope(
+          canPop: !_isChatOpen,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop && _isChatOpen) {
+              setState(() => _isChatOpen = false);
+            }
+          },
+          child: Scaffold(
+            body: SafeArea(
+              bottom: false,
+              child: Stack(
+                children: [
+                  if (_isChatOpen)
+                    ChatInboxScreen(bottomPadding: _bottomSpace(context))
+                  else if (isSearchTab)
+                    SearchScreen(bottomPadding: _bottomSpace(context))
+                  else if (isActivityTab)
+                    ActivityScreen(bottomPadding: _bottomSpace(context))
+                  else if (isProfileTab)
+                    currentUser == null
+                        ? const Center(child: Text('Profile is unavailable.'))
+                        : ProfileScreen(
+                            userId: currentUser.id,
+                            bottomPadding: _bottomSpace(context),
+                          )
+                  else
+                    Column(
+                      children: [
+                        HomeHeader(isCompact: _isHeaderCompact),
+                        Expanded(
+                          child: ListView.separated(
+                            controller: _scrollController,
+                            padding: EdgeInsets.only(
+                              bottom: shouldShowBottomBar
+                                  ? _bottomSpace(context)
+                                  : 12,
+                            ),
+                            itemCount: state.rootThreads.length + 1,
+                            itemBuilder: (context, index) {
+                              if (index == 0) {
+                                return CreatePostCard(
+                                  currentUser: state.currentUser,
+                                  onTap: () => _openCreateThreadSheet(state),
+                                );
+                              }
+
+                              final rootThread = state.rootThreads[index - 1];
+                              return Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  0,
+                                  14,
+                                  0,
+                                  16,
+                                ),
+                                child: HomeThreadPreviewBlock(
+                                  rootThread: rootThread,
+                                  onRootTap: () =>
+                                      _openThreadDetail(rootThread),
+                                  onReplyTap: () =>
+                                      _openThreadDetail(rootThread),
+                                  onLikeTap: context
+                                      .read<HomeCubit>()
+                                      .togglePostLike,
+                                  onPreviewReplyTap: (replyThread) =>
+                                      _openThreadBranch(
+                                        rootThread: rootThread,
+                                        selectedThread: replyThread,
+                                      ),
+                                ),
                               );
-                            }
-
-                            final rootThread = state.rootThreads[index - 1];
-                            return Padding(
-                              padding: const EdgeInsets.fromLTRB(0, 14, 0, 16),
-                              child: HomeThreadPreviewBlock(
-                                rootThread: rootThread,
-                                onRootTap: () => _openThreadDetail(rootThread),
-                                onReplyTap: () => _openThreadDetail(rootThread),
-                                onPreviewReplyTap: (replyThread) =>
-                                    _openThreadBranch(
-                                      rootThread: rootThread,
-                                      selectedThread: replyThread,
-                                    ),
-                              ),
-                            );
-                          },
-                          separatorBuilder: (_, __) => const PostDivider(),
+                            },
+                            separatorBuilder: (_, __) => const PostDivider(),
+                          ),
                         ),
+                      ],
+                    ),
+                  if (!_isChatOpen &&
+                      !isSearchTab &&
+                      !isActivityTab &&
+                      !isProfileTab)
+                    Positioned(
+                      top: 8,
+                      right: 10,
+                      child: Row(
+                        children: [
+                          _ChatButton(
+                            onTap: () => setState(() => _isChatOpen = true),
+                          ),
+                          const SizedBox(width: 8),
+                          _ThemeModeMenuButton(
+                            selectedThemeMode: selectedThemeMode,
+                            onSelected: context
+                                .read<ThemeModeCubit>()
+                                .setThemeMode,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                if (!isProfileTab && !isActivityTab)
+                    ),
                   Positioned(
-                    top: 8,
-                    right: 10,
-                    child: _ThemeModeMenuButton(
-                      selectedThemeMode: selectedThemeMode,
-                      onSelected: context.read<ThemeModeCubit>().setThemeMode,
-                    ),
-                  ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: AnimatedSlide(
-                    duration: const Duration(milliseconds: 320),
-                    curve: Curves.easeInOutCubic,
-                    offset: shouldShowBottomBar
-                        ? Offset.zero
-                        : const Offset(0, 1.25),
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOut,
-                      opacity: shouldShowBottomBar ? 1 : 0,
-                      child: IgnorePointer(
-                        ignoring: !shouldShowBottomBar,
-                        child: HomeBottomTabBar(
-                          selectedIndex: state.selectedTabIndex,
-                          onTap: (index) => _handleBottomTabTap(index, state),
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: AnimatedSlide(
+                      duration: const Duration(milliseconds: 320),
+                      curve: Curves.easeInOutCubic,
+                      offset: shouldShowBottomBar
+                          ? Offset.zero
+                          : const Offset(0, 1.25),
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOut,
+                        opacity: shouldShowBottomBar ? 1 : 0,
+                        child: IgnorePointer(
+                          ignoring: !shouldShowBottomBar,
+                          child: HomeBottomTabBar(
+                            selectedIndex: state.selectedTabIndex,
+                            onTap: (index) => _handleBottomTabTap(index, state),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
       },
+    );
+  }
+}
+
+class _ChatButton extends StatelessWidget {
+  const _ChatButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: IconButton(
+        tooltip: 'Chat',
+        icon: const Icon(Icons.chat_bubble_outline_rounded, size: 20),
+        color: colorScheme.onSurface,
+        onPressed: onTap,
+      ),
     );
   }
 }

@@ -3,11 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/models/user.dart';
 
 class AvatarView extends StatelessWidget {
-  const AvatarView({
-    super.key,
-    required this.user,
-    this.radius = 15,
-  });
+  const AvatarView({super.key, required this.user, this.radius = 15});
 
   final User user;
   final double radius;
@@ -21,6 +17,14 @@ class AvatarView extends StatelessWidget {
         radius: radius,
         backgroundColor: backgroundColor,
         backgroundImage: AssetImage(user.avatarAssetPath!),
+      );
+    }
+
+    if (user.avatarUrl != null && user.avatarUrl!.isNotEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: backgroundColor,
+        backgroundImage: NetworkImage(user.avatarUrl!),
       );
     }
 
