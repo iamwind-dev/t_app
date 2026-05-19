@@ -27,7 +27,29 @@ class AuthRepository implements AuthSessionRepository {
       decode: (value) => AuthSession.fromJson(_asMap(value)),
     );
 
-    await _tokenStore.writeToken(session.accessToken);
+    await _persistSession(session);
+    return session;
+  }
+
+  @override
+  Future<AuthSession> register({
+    required String email,
+    required String username,
+    required String password,
+    required String displayName,
+  }) async {
+    final session = await _apiClient.post<AuthSession>(
+      '/auth/register',
+      data: {
+        'email': email.trim(),
+        'username': username.trim(),
+        'password': password,
+        'displayName': displayName.trim(),
+      },
+      decode: (value) => AuthSession.fromJson(_asMap(value)),
+    );
+
+    await _persistSession(session);
     return session;
   }
 
@@ -45,7 +67,7 @@ class AuthRepository implements AuthSessionRepository {
       );
       final userJson = response['user'];
       if (userJson is! Map<String, dynamic>) {
-        throw const FormatException('Phản hồi người dùng hiện tại thiếu user.');
+        throw const FormatException('Current-user response missing user.');
       }
 
       return AuthUser.fromJson(userJson);
@@ -60,8 +82,40 @@ class AuthRepository implements AuthSessionRepository {
   }
 
   @override
-  Future<void> logOut() {
-    return _tokenStore.clearToken();
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _apiClient.post<Map<String, dynamic>>(
+      '/auth/change-password',
+      data: {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      },
+      decode: _asMap,
+    );
+    await _tokenStore.clearToken();
+  }
+
+  @override
+  Future<void> logOut() async {
+    final refreshToken = await _tokenStore.readRefreshToken();
+    try {
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        await _apiClient.post<Map<String, dynamic>>(
+          '/auth/logout',
+          data: {'refreshToken': refreshToken},
+          decode: _asMap,
+        );
+      }
+    } finally {
+      await _tokenStore.clearToken();
+    }
+  }
+
+  Future<void> _persistSession(AuthSession session) async {
+    await _tokenStore.writeToken(session.accessToken);
+    await _tokenStore.writeRefreshToken(session.refreshToken);
   }
 
   static Map<String, dynamic> _asMap(Object? value) {
@@ -69,6 +123,6 @@ class AuthRepository implements AuthSessionRepository {
       return value;
     }
 
-    throw const FormatException('Cần một đối tượng JSON.');
+    throw const FormatException('Expected a JSON object.');
   }
 }

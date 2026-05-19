@@ -25,10 +25,23 @@ class UploadImageResult extends Equatable {
   });
 
   factory UploadImageResult.fromJson(Map<String, dynamic> json) {
+    final secureUrl = json['secureUrl'] as String? ?? json['url'] as String?;
+    final publicId = json['publicId'] as String?;
+    final typeValue = json['type'] as String?;
+    if (secureUrl == null || secureUrl.isEmpty) {
+      throw const FormatException('Upload image response missing url.');
+    }
+    if (publicId == null || publicId.isEmpty) {
+      throw const FormatException('Upload image response missing publicId.');
+    }
+    if (typeValue == null || typeValue.isEmpty) {
+      throw const FormatException('Upload image response missing type.');
+    }
+
     return UploadImageResult(
-      secureUrl: json['secureUrl'] as String,
-      publicId: json['publicId'] as String,
-      type: UploadImageType.fromValue(json['type'] as String),
+      secureUrl: secureUrl,
+      publicId: publicId,
+      type: UploadImageType.fromValue(typeValue),
     );
   }
 

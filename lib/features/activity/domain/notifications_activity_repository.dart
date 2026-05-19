@@ -7,6 +7,8 @@ abstract interface class NotificationsActivityRepository {
     bool unreadOnly = false,
   });
 
+  Future<int> getUnreadCount();
+
   Future<NotificationRecord> markAsRead(String notificationId);
 
   Future<int> markAllAsRead();

@@ -19,6 +19,7 @@ class ActivityCubit extends Cubit<ActivityState> {
   final NotificationsActivityRepository _notificationsRepository;
   final UsersProfileRepository _usersRepository;
 
+  /// Loads notifications and the current unread count from the backend.
   Future<void> loadNotifications() async {
     if (AppConfig.uiPreviewMode) {
       emit(
@@ -34,6 +35,7 @@ class ActivityCubit extends Cubit<ActivityState> {
 
     try {
       final page = await _notificationsRepository.listNotifications();
+      final unreadCount = await _notificationsRepository.getUnreadCount();
       emit(
         ActivityState(
           status: ActivityStatus.loaded,
@@ -42,6 +44,7 @@ class ActivityCubit extends Cubit<ActivityState> {
               .toList(growable: false),
           nextCursor: page.pageInfo.nextCursor,
           hasNextPage: page.pageInfo.hasNextPage,
+          unreadCount: unreadCount,
         ),
       );
     } on ApiException catch (error) {
@@ -61,6 +64,80 @@ class ActivityCubit extends Cubit<ActivityState> {
     }
   }
 
+  /// Marks one notification as read and decrements the local unread badge.
+  Future<void> markAsRead(String notificationId) async {
+    if (AppConfig.uiPreviewMode) {
+      return;
+    }
+
+    ActivityItemModel? current;
+    for (final item in state.items) {
+      if (item.id == notificationId) {
+        current = item;
+        break;
+      }
+    }
+    if (current == null || current.isRead) {
+      return;
+    }
+
+    try {
+      await _notificationsRepository.markAsRead(notificationId);
+      emit(
+        state.copyWith(
+          items: state.items
+              .map(
+                (item) => item.id == notificationId
+                    ? item.copyWith(isRead: true)
+                    : item,
+              )
+              .toList(growable: false),
+          unreadCount: state.unreadCount > 0 ? state.unreadCount - 1 : 0,
+          clearError: true,
+        ),
+      );
+    } on ApiException catch (error) {
+      emit(state.copyWith(errorMessage: error.message));
+    } catch (_) {
+      emit(state.copyWith(errorMessage: 'Khong the cap nhat thong bao.'));
+    }
+  }
+
+  /// Marks all currently listed notifications as read through the API.
+  Future<void> markAllAsRead() async {
+    if (AppConfig.uiPreviewMode || state.unreadCount == 0) {
+      return;
+    }
+
+    emit(state.copyWith(isMarkingAllRead: true, clearError: true));
+
+    try {
+      await _notificationsRepository.markAllAsRead();
+      emit(
+        state.copyWith(
+          items: state.items
+              .map((item) => item.copyWith(isRead: true))
+              .toList(growable: false),
+          unreadCount: 0,
+          isMarkingAllRead: false,
+          clearError: true,
+        ),
+      );
+    } on ApiException catch (error) {
+      emit(
+        state.copyWith(isMarkingAllRead: false, errorMessage: error.message),
+      );
+    } catch (_) {
+      emit(
+        state.copyWith(
+          isMarkingAllRead: false,
+          errorMessage: 'Khong the danh dau da doc.',
+        ),
+      );
+    }
+  }
+
+  /// Toggles follow state for a follow suggestion item.
   Future<void> toggleFollow(ActivityItemModel item) async {
     if (item.type != ActivityItemType.followSuggestion) {
       return;

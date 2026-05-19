@@ -51,6 +51,42 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     super.dispose();
   }
 
+  /// Confirms deletion before calling the REST-backed delete flow.
+  Future<void> _handleDeleteMessage(ChatMessage message) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Xoa tin nhan?'),
+          content: const Text('Tin nhan nay se bi xoa khoi cuoc tro chuyen.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Huy'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Xoa'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true || !mounted) {
+      return;
+    }
+
+    final errorMessage = await _cubit.deleteMessage(message);
+    if (errorMessage == null || !mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(errorMessage)));
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider.value(
@@ -67,7 +103,12 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                     conversation: state.conversation,
                     currentUserId: state.currentUserId,
                   ),
-                  Expanded(child: _ConversationBody(state: state)),
+                  Expanded(
+                    child: _ConversationBody(
+                      state: state,
+                      onDeleteMessage: _handleDeleteMessage,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -209,9 +250,10 @@ class _MoreButton extends StatelessWidget {
 }
 
 class _ConversationBody extends StatelessWidget {
-  const _ConversationBody({required this.state});
+  const _ConversationBody({required this.state, required this.onDeleteMessage});
 
   final ChatThreadState state;
+  final ValueChanged<ChatMessage> onDeleteMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -263,6 +305,7 @@ class _ConversationBody extends StatelessWidget {
                     ? _OutgoingMessage(
                         message: message,
                         showStatus: message.id == lastMineId,
+                        onLongPress: () => onDeleteMessage(message),
                       )
                     : _IncomingMessage(message: message),
               );
@@ -309,10 +352,15 @@ class _IncomingMessage extends StatelessWidget {
 }
 
 class _OutgoingMessage extends StatelessWidget {
-  const _OutgoingMessage({required this.message, required this.showStatus});
+  const _OutgoingMessage({
+    required this.message,
+    required this.showStatus,
+    required this.onLongPress,
+  });
 
   final ChatMessage message;
   final bool showStatus;
+  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -324,11 +372,14 @@ class _OutgoingMessage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          _Bubble(
-            text: message.displayContent,
-            backgroundColor: ChatThreadTokens.outgoingBubble(context),
-            textStyle: ChatThreadTokens.outgoingMessage(context),
-            borderRadius: ChatThreadTokens.outgoingBubbleBorderRadius,
+          GestureDetector(
+            onLongPress: onLongPress,
+            child: _Bubble(
+              text: message.displayContent,
+              backgroundColor: ChatThreadTokens.outgoingBubble(context),
+              textStyle: ChatThreadTokens.outgoingMessage(context),
+              borderRadius: ChatThreadTokens.outgoingBubbleBorderRadius,
+            ),
           ),
           if (showStatus) ...[
             const SizedBox(height: 4),

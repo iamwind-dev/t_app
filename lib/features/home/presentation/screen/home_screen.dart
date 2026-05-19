@@ -99,8 +99,10 @@ class _HomeScreenState extends State<HomeScreen> {
     return showCreateThreadSheet(
       context: context,
       currentUser: _buildCurrentUser(state),
-      onSubmit: (request) =>
-          context.read<HomeCubit>().createPost(request.primaryContent),
+      onSubmit: (request) => context.read<HomeCubit>().createPost(
+        request.primaryContent,
+        mediaUrls: request.mediaUrls,
+      ),
     );
   }
 

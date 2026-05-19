@@ -1,9 +1,8 @@
 class AppConfig {
   const AppConfig._();
 
-  // Temporary UI preview mode: bypass backend calls so the app can be explored
-  // before API/environment setup is ready.
-  static const uiPreviewMode = true;
+  // Keep backend mode on by default now that API repositories are wired.
+  static const uiPreviewMode = false;
 
   static const apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',

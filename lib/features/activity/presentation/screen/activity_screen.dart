@@ -5,8 +5,10 @@ import 'package:t_app/features/activity/domain/notifications_activity_repository
 import 'package:t_app/features/activity/presentation/cubit/activity_cubit.dart';
 import 'package:t_app/features/activity/presentation/cubit/activity_state.dart';
 import 'package:t_app/features/home/presentation/widget/post_divider.dart';
+import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 import 'package:t_app/features/post_detail/presentation/screen/thread_detail_screen.dart';
 import 'package:t_app/features/post_detail/presentation/widget/thread_item_widget.dart';
+import 'package:t_app/features/posts/domain/posts_feed_repository.dart';
 import 'package:t_app/features/users/domain/users_profile_repository.dart';
 import 'package:t_app/features/users/presentation/widgets/user_avatar_button.dart';
 import 'package:t_app/features/users/presentation/widgets/user_name_button.dart';
@@ -57,16 +59,67 @@ class _ActivityScreenState extends State<ActivityScreen> {
     }
   }
 
-  void _openThread(ActivityItemModel item) {
-    if (item.thread == null) {
+  /// Opens the related content and syncs read state before navigation.
+  Future<void> _openThread(ActivityItemModel item) async {
+    if (!item.isRead) {
+      await _activityCubit.markAsRead(item.id);
+    }
+    if (!mounted) {
       return;
     }
 
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ThreadDetailScreen(rootThread: item.thread!),
-      ),
-    );
+    final thread = item.thread;
+    if (thread != null) {
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ThreadDetailScreen(rootThread: thread),
+        ),
+      );
+      return;
+    }
+
+    final targetId = item.targetId;
+    if (targetId == null || targetId.isEmpty) {
+      return;
+    }
+
+    try {
+      final postsRepository = context.read<PostsFeedRepository>();
+      final rootThread = switch (item.targetType) {
+        'POST' => await postsRepository.getPost(targetId),
+        'REPLY' => await _loadReplyRootThread(postsRepository, targetId),
+        _ => null,
+      };
+      if (!mounted || rootThread == null) {
+        return;
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ThreadDetailScreen(rootThread: rootThread),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Khong the mo noi dung nay.')),
+      );
+    }
+  }
+
+  Future<ThreadItemModel?> _loadReplyRootThread(
+    PostsFeedRepository postsRepository,
+    String replyId,
+  ) async {
+    final reply = await postsRepository.getReply(replyId);
+    return postsRepository.getPost(reply.rootThreadId);
   }
 
   @override
@@ -85,11 +138,14 @@ class _ActivityScreenState extends State<ActivityScreen> {
             if (index == 0) {
               return ActivityHeader(
                 activeFilter: _activeFilter,
+                unreadCount: state.unreadCount,
+                isMarkingAllRead: state.isMarkingAllRead,
                 onFilterChanged: (filter) {
                   setState(() {
                     _activeFilter = filter;
                   });
                 },
+                onMarkAllRead: _activityCubit.markAllAsRead,
               );
             }
 
@@ -103,13 +159,15 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
               if (state.status == ActivityStatus.failure) {
                 return _ActivityMessage(
-                  message: state.errorMessage ?? 'Không thể tải hoạt động.',
+                  message:
+                      state.errorMessage ??
+                      'KhÃ´ng thá»ƒ táº£i hoáº¡t Ä‘á»™ng.',
                 );
               }
 
               if (items.isEmpty) {
                 return const _ActivityMessage(
-                  message: 'Chưa có hoạt động nào.',
+                  message: 'ChÆ°a cÃ³ hoáº¡t Ä‘á»™ng nÃ o.',
                 );
               }
 
@@ -160,25 +218,69 @@ class ActivityHeader extends StatelessWidget {
   const ActivityHeader({
     super.key,
     required this.activeFilter,
+    required this.unreadCount,
+    required this.isMarkingAllRead,
     required this.onFilterChanged,
+    required this.onMarkAllRead,
   });
 
   final ActivityFilter activeFilter;
+  final int unreadCount;
+  final bool isMarkingAllRead;
   final ValueChanged<ActivityFilter> onFilterChanged;
+  final Future<void> Function() onMarkAllRead;
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Hoạt động',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.8,
-            ),
+          Row(
+            children: [
+              Text(
+                'Hoáº¡t Ä‘á»™ng',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.8,
+                ),
+              ),
+              if (unreadCount > 0) ...[
+                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '$unreadCount',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: colorScheme.onPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+              const Spacer(),
+              if (unreadCount > 0)
+                TextButton(
+                  onPressed: isMarkingAllRead ? null : onMarkAllRead,
+                  child: isMarkingAllRead
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Da doc het'),
+                ),
+            ],
           ),
           const SizedBox(height: 18),
           ActivityFilterChips(
@@ -202,9 +304,9 @@ class ActivityFilterChips extends StatelessWidget {
   final ValueChanged<ActivityFilter> onChanged;
 
   static const _entries = [
-    (ActivityFilter.all, 'Tất cả'),
-    (ActivityFilter.follows, 'Lượt theo dõi'),
-    (ActivityFilter.conversations, 'Cuộc trò chuyện'),
+    (ActivityFilter.all, 'Táº¥t cáº£'),
+    (ActivityFilter.follows, 'LÆ°á»£t theo dÃµi'),
+    (ActivityFilter.conversations, 'Cuá»™c trÃ² chuyá»‡n'),
   ];
 
   @override
@@ -518,7 +620,7 @@ class _FollowButton extends StatelessWidget {
           ),
         ),
         child: Text(
-          isFollowed ? 'Đang theo dõi' : 'Theo dõi',
+          isFollowed ? 'Äang theo dÃµi' : 'Theo dÃµi',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w700,
             color: isFollowed ? colorScheme.onSurface : Colors.black,

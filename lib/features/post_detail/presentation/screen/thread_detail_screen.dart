@@ -154,6 +154,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
             author: _currentUser,
             createdAt: 'vừa xong',
             content: request.primaryContent,
+            imageUrls: request.mediaUrls,
           );
           if (!mounted) {
             return;
@@ -173,10 +174,12 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
             ? await _postsRepository.createPostReply(
                 postId: _rootThread.id,
                 content: request.primaryContent,
+                mediaUrls: request.mediaUrls,
               )
             : await _postsRepository.createChildReply(
                 replyId: targetThread.id,
                 content: request.primaryContent,
+                mediaUrls: request.mediaUrls,
               );
 
         if (!mounted) {

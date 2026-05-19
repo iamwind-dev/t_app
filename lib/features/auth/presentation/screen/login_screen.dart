@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:t_app/core/keys/auth/auth_widget_keys.dart';
 import 'package:t_app/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:t_app/features/auth/presentation/cubit/auth_state.dart';
+import 'package:t_app/features/auth/presentation/screen/register_screen.dart';
 import 'package:t_app/features/auth/presentation/theme/login_tokens.dart';
 import 'package:t_app/generated/assets.gen.dart';
 
@@ -174,6 +175,19 @@ class _LoginFormState extends State<_LoginForm> {
             _LoginButton(
               isLoading: isLoading,
               onPressed: isLoading ? null : _submit,
+            ),
+            const SizedBox(height: LoginTokens.formGap),
+            TextButton(
+              onPressed: isLoading
+                  ? null
+                  : () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const RegisterScreen(),
+                        ),
+                      );
+                    },
+              child: const Text('Tạo tài khoản mới'),
             ),
           ],
         );

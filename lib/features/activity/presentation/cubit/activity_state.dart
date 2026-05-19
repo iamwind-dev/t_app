@@ -9,6 +9,8 @@ class ActivityState extends Equatable {
     this.items = const [],
     this.nextCursor,
     this.hasNextPage = false,
+    this.unreadCount = 0,
+    this.isMarkingAllRead = false,
     this.errorMessage,
   });
 
@@ -16,6 +18,8 @@ class ActivityState extends Equatable {
   final List<ActivityItemModel> items;
   final String? nextCursor;
   final bool hasNextPage;
+  final int unreadCount;
+  final bool isMarkingAllRead;
   final String? errorMessage;
 
   ActivityState copyWith({
@@ -23,6 +27,8 @@ class ActivityState extends Equatable {
     List<ActivityItemModel>? items,
     String? nextCursor,
     bool? hasNextPage,
+    int? unreadCount,
+    bool? isMarkingAllRead,
     String? errorMessage,
     bool clearError = false,
   }) {
@@ -31,6 +37,8 @@ class ActivityState extends Equatable {
       items: items ?? this.items,
       nextCursor: nextCursor ?? this.nextCursor,
       hasNextPage: hasNextPage ?? this.hasNextPage,
+      unreadCount: unreadCount ?? this.unreadCount,
+      isMarkingAllRead: isMarkingAllRead ?? this.isMarkingAllRead,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
     );
   }
@@ -41,6 +49,8 @@ class ActivityState extends Equatable {
     items,
     nextCursor,
     hasNextPage,
+    unreadCount,
+    isMarkingAllRead,
     errorMessage,
   ];
 }

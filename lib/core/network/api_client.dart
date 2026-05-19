@@ -43,6 +43,7 @@ class ApiClient {
   }) {
     return _request<T>(
       () => _dio.get<Object?>(path, queryParameters: queryParameters),
+      path: path,
       decode: decode,
     );
   }
@@ -54,6 +55,7 @@ class ApiClient {
   }) {
     return _request<T>(
       () => _dio.post<Object?>(path, data: data),
+      path: path,
       decode: decode,
     );
   }
@@ -65,6 +67,7 @@ class ApiClient {
   }) {
     return _request<T>(
       () => _dio.patch<Object?>(path, data: data),
+      path: path,
       decode: decode,
     );
   }
@@ -73,12 +76,18 @@ class ApiClient {
     String path, {
     required T Function(Object? value) decode,
   }) {
-    return _request<T>(() => _dio.delete<Object?>(path), decode: decode);
+    return _request<T>(
+      () => _dio.delete<Object?>(path),
+      path: path,
+      decode: decode,
+    );
   }
 
   Future<T> _request<T>(
     Future<Response<Object?>> Function() send, {
+    required String path,
     required T Function(Object? value) decode,
+    bool allowRefresh = true,
   }) async {
     try {
       final response = await send();
@@ -88,9 +97,25 @@ class ApiClient {
         return decode(envelope.data);
       }
 
+      if (_shouldRefresh(
+        path: path,
+        statusCode: response.statusCode,
+        allowRefresh: allowRefresh,
+      )) {
+        final refreshed = await _refreshAccessToken();
+        if (refreshed) {
+          return _request<T>(
+            send,
+            path: path,
+            decode: decode,
+            allowRefresh: false,
+          );
+        }
+      }
+
       throw ApiException(
         code: envelope.errorCode,
-        message: envelope.errorMessage ?? 'Yêu cầu thất bại.',
+        message: envelope.errorMessage ?? 'Request failed.',
         statusCode: response.statusCode,
       );
     } on DioException catch (error) {
@@ -98,13 +123,66 @@ class ApiClient {
     } on ApiException {
       rethrow;
     } catch (error) {
-      throw ApiException(message: 'Không thể đọc phản hồi API: $error');
+      throw ApiException(message: 'Failed to decode API response: $error');
+    }
+  }
+
+  bool _shouldRefresh({
+    required String path,
+    required int? statusCode,
+    required bool allowRefresh,
+  }) {
+    if (!allowRefresh || statusCode != 401) {
+      return false;
+    }
+
+    return path != '/auth/login' &&
+        path != '/auth/register' &&
+        path != '/auth/refresh' &&
+        path != '/auth/logout';
+  }
+
+  Future<bool> _refreshAccessToken() async {
+    final refreshToken = await _tokenStore.readRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      await _tokenStore.clearToken();
+      return false;
+    }
+
+    try {
+      final response = await _dio.post<Object?>(
+        '/auth/refresh',
+        data: {'refreshToken': refreshToken},
+      );
+      final envelope = _readEnvelope(response.data);
+      if (!envelope.success || envelope.data is! Map<String, dynamic>) {
+        await _tokenStore.clearToken();
+        return false;
+      }
+
+      final data = envelope.data as Map<String, dynamic>;
+      final nextAccessToken = data['accessToken'] as String?;
+      final nextRefreshToken = data['refreshToken'] as String?;
+      if (nextAccessToken == null ||
+          nextAccessToken.isEmpty ||
+          nextRefreshToken == null ||
+          nextRefreshToken.isEmpty) {
+        await _tokenStore.clearToken();
+        return false;
+      }
+
+      await _tokenStore.writeToken(nextAccessToken);
+      await _tokenStore.writeRefreshToken(nextRefreshToken);
+      return true;
+    } catch (_) {
+      await _tokenStore.clearToken();
+      return false;
     }
   }
 
   _ApiEnvelope _readEnvelope(Object? data) {
     if (data is! Map<String, dynamic>) {
-      throw const ApiException(message: 'Định dạng phản hồi API không hợp lệ.');
+      throw const ApiException(message: 'Invalid API response envelope.');
     }
 
     return _ApiEnvelope.fromJson(data);
@@ -117,13 +195,13 @@ class ApiClient {
       final envelope = _ApiEnvelope.fromJson(data);
       return ApiException(
         code: envelope.errorCode,
-        message: envelope.errorMessage ?? error.message ?? 'Yêu cầu thất bại.',
+        message: envelope.errorMessage ?? error.message ?? 'Request failed.',
         statusCode: response?.statusCode,
       );
     }
 
     return ApiException(
-      message: error.message ?? 'Yêu cầu mạng thất bại.',
+      message: error.message ?? 'Network request failed.',
       statusCode: response?.statusCode,
     );
   }

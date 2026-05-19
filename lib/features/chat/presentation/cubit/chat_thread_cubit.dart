@@ -34,6 +34,7 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
 
   ChatSocketService? get socketService => _socketService;
 
+  /// Loads the current thread and syncs seen state for the latest inbound message.
   Future<void> loadMessages() async {
     if (AppConfig.uiPreviewMode) {
       emit(
@@ -235,6 +236,48 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
     await _socketService?.typingStop(state.conversation.id);
   }
 
+  /// Deletes one of the current user's messages through the REST API.
+  Future<String?> deleteMessage(ChatMessage message) async {
+    if (message.sender.id != state.currentUserId) {
+      return 'Khong the xoa tin nhan nay.';
+    }
+
+    if (AppConfig.uiPreviewMode) {
+      emit(
+        state.copyWith(
+          messages: state.messages
+              .where((current) => current.id != message.id)
+              .toList(growable: false),
+          clearError: true,
+        ),
+      );
+      return null;
+    }
+
+    try {
+      await _repository.deleteMessage(
+        conversationId: state.conversation.id,
+        messageId: message.id,
+      );
+      emit(
+        state.copyWith(
+          messages: state.messages
+              .where((current) => current.id != message.id)
+              .toList(growable: false),
+          clearError: true,
+        ),
+      );
+      return null;
+    } on ApiException catch (error) {
+      emit(state.copyWith(errorMessage: error.message));
+      return error.message;
+    } catch (_) {
+      const messageText = 'Khong the xoa tin nhan.';
+      emit(state.copyWith(errorMessage: messageText));
+      return messageText;
+    }
+  }
+
   void _handleConnectionStatus(ChatConnectionStatus status) {
     emit(state.copyWith(connectionStatus: status));
   }
@@ -291,10 +334,7 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
     );
 
     if (event.message.sender.id != state.currentUserId) {
-      await _socketService?.markSeen(
-        conversationId: state.conversation.id,
-        messageId: event.message.id,
-      );
+      await _markSeenWithFallback(messageId: event.message.id);
     }
   }
 
@@ -366,6 +406,27 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
     return deduped;
   }
 
+  /// Prefers realtime seen events, then falls back to REST if needed.
+  Future<void> _markSeenWithFallback({required String messageId}) async {
+    final socketService = _socketService;
+    if (socketService != null) {
+      try {
+        await socketService.markSeen(
+          conversationId: state.conversation.id,
+          messageId: messageId,
+        );
+        return;
+      } catch (_) {}
+    }
+
+    try {
+      await _repository.markSeen(
+        conversationId: state.conversation.id,
+        messageId: messageId,
+      );
+    } catch (_) {}
+  }
+
   Future<void> _markLatestIncomingSeen() async {
     ChatMessage? latestIncoming;
     for (final message in state.messages) {
@@ -378,10 +439,7 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
       return;
     }
 
-    await _socketService?.markSeen(
-      conversationId: state.conversation.id,
-      messageId: latestIncoming.id,
-    );
+    await _markSeenWithFallback(messageId: latestIncoming.id);
   }
 
   @override

@@ -25,10 +25,13 @@ class PostsRepository implements PostsFeedRepository {
   }
 
   @override
-  Future<ThreadItemModel> createPost({required String content}) async {
+  Future<ThreadItemModel> createPost({
+    required String content,
+    List<String> mediaUrls = const <String>[],
+  }) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
       '/posts',
-      data: {'content': content, 'mediaUrls': const <String>[]},
+      data: {'content': content, 'mediaUrls': mediaUrls},
       decode: _asMap,
     );
 
@@ -43,6 +46,62 @@ class PostsRepository implements PostsFeedRepository {
     );
 
     return ThreadApiMapper.postFromJson(_readObject(response, 'post'));
+  }
+
+  @override
+  Future<ThreadItemModel> updatePost({
+    required String postId,
+    required String content,
+    List<String> mediaUrls = const <String>[],
+  }) async {
+    final response = await _apiClient.patch<Map<String, dynamic>>(
+      '/posts/$postId',
+      data: {'content': content, 'mediaUrls': mediaUrls},
+      decode: _asMap,
+    );
+
+    return ThreadApiMapper.postFromJson(_readObject(response, 'post'));
+  }
+
+  @override
+  Future<void> deletePost(String postId) async {
+    await _apiClient.delete<Map<String, dynamic>>(
+      '/posts/$postId',
+      decode: _asMap,
+    );
+  }
+
+  @override
+  Future<ThreadItemModel> getReply(String replyId) async {
+    final response = await _apiClient.get<Map<String, dynamic>>(
+      '/replies/$replyId',
+      decode: _asMap,
+    );
+
+    return ThreadApiMapper.replyFromJson(_readObject(response, 'reply'));
+  }
+
+  @override
+  Future<ThreadItemModel> updateReply({
+    required String replyId,
+    required String content,
+    List<String> mediaUrls = const <String>[],
+  }) async {
+    final response = await _apiClient.patch<Map<String, dynamic>>(
+      '/replies/$replyId',
+      data: {'content': content, 'mediaUrls': mediaUrls},
+      decode: _asMap,
+    );
+
+    return ThreadApiMapper.replyFromJson(_readObject(response, 'reply'));
+  }
+
+  @override
+  Future<void> deleteReply(String replyId) async {
+    await _apiClient.delete<Map<String, dynamic>>(
+      '/replies/$replyId',
+      decode: _asMap,
+    );
   }
 
   @override
@@ -73,10 +132,11 @@ class PostsRepository implements PostsFeedRepository {
   Future<ThreadItemModel> createPostReply({
     required String postId,
     required String content,
+    List<String> mediaUrls = const <String>[],
   }) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
       '/posts/$postId/replies',
-      data: {'content': content, 'mediaUrls': const <String>[]},
+      data: {'content': content, 'mediaUrls': mediaUrls},
       decode: _asMap,
     );
 
@@ -87,10 +147,11 @@ class PostsRepository implements PostsFeedRepository {
   Future<ThreadItemModel> createChildReply({
     required String replyId,
     required String content,
+    List<String> mediaUrls = const <String>[],
   }) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
       '/replies/$replyId/replies',
-      data: {'content': content, 'mediaUrls': const <String>[]},
+      data: {'content': content, 'mediaUrls': mediaUrls},
       decode: _asMap,
     );
 
@@ -138,7 +199,7 @@ class PostsRepository implements PostsFeedRepository {
       return value;
     }
 
-    throw FormatException('Phản hồi thiếu trường $key.');
+    throw FormatException('Response missing $key.');
   }
 
   static Map<String, dynamic> _asMap(Object? value) {
@@ -146,6 +207,6 @@ class PostsRepository implements PostsFeedRepository {
       return value;
     }
 
-    throw const FormatException('Cần một đối tượng JSON.');
+    throw const FormatException('Expected a JSON object.');
   }
 }

@@ -7,12 +7,16 @@ class SecureApiTokenStore implements ApiTokenStore {
     : _storage = storage ?? const FlutterSecureStorage();
 
   static const _accessTokenKey = 'accessToken';
+  static const _refreshTokenKey = 'refreshToken';
 
   final FlutterSecureStorage _storage;
 
   @override
   Future<void> clearToken() {
-    return _storage.delete(key: _accessTokenKey);
+    return Future.wait([
+      _storage.delete(key: _accessTokenKey),
+      _storage.delete(key: _refreshTokenKey),
+    ]);
   }
 
   @override
@@ -21,7 +25,17 @@ class SecureApiTokenStore implements ApiTokenStore {
   }
 
   @override
+  Future<String?> readRefreshToken() {
+    return _storage.read(key: _refreshTokenKey);
+  }
+
+  @override
   Future<void> writeToken(String token) {
     return _storage.write(key: _accessTokenKey, value: token);
+  }
+
+  @override
+  Future<void> writeRefreshToken(String token) {
+    return _storage.write(key: _refreshTokenKey, value: token);
   }
 }

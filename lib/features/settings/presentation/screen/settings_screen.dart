@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:t_app/core/theme/theme_mode_cubit.dart';
 import 'package:t_app/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:t_app/features/settings/presentation/screen/change_password_screen.dart';
 import 'package:t_app/features/settings/presentation/screen/privacy_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -32,12 +33,19 @@ class SettingsScreen extends StatelessWidget {
                   icon: Icons.person_outline_rounded,
                   title: 'Tài khoản',
                   subtitle: 'Thông tin cá nhân, bảo mật và xác minh',
-                  onTap: () => _showComingSoon(context),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ChangePasswordScreen(),
+                      ),
+                    );
+                  },
                 ),
                 _SettingsTile(
                   icon: Icons.lock_outline_rounded,
                   title: 'Quyền riêng tư',
-                  subtitle: 'Người theo dõi, nhắc đến và trạng thái hoạt động',
+                  subtitle:
+                      'Người theo dõi, nhắc đến và trạng thái hoạt động',
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(

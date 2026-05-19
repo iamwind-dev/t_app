@@ -17,6 +17,7 @@ import 'package:t_app/features/post_detail/presentation/widget/thread_item_widge
 import 'package:t_app/features/profile/data/profile_mock_data.dart';
 import 'package:t_app/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:t_app/features/profile/presentation/cubit/profile_state.dart';
+import 'package:t_app/features/profile/presentation/screen/profile_connections_screen.dart';
 import 'package:t_app/features/settings/presentation/screen/settings_screen.dart';
 import 'package:t_app/features/uploads/data/upload_image_result.dart';
 import 'package:t_app/features/uploads/domain/uploads_image_repository.dart';
@@ -128,6 +129,15 @@ class _ProfileScreenState extends State<ProfileScreen>
     return _directConversationCubit.createDirectConversation(profile.id);
   }
 
+  void _openConnections(ProfileConnectionsMode mode) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ProfileConnectionsScreen(userId: widget.userId, mode: mode),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -222,7 +232,15 @@ class _ProfileScreenState extends State<ProfileScreen>
                       const SizedBox(height: 16),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: ProfileFollowersPreview(profile: profile),
+                        child: ProfileConnectionsSummary(
+                          profile: profile,
+                          onFollowersTap: () => _openConnections(
+                            ProfileConnectionsMode.followers,
+                          ),
+                          onFollowingTap: () => _openConnections(
+                            ProfileConnectionsMode.following,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 18),
                       BlocBuilder<
@@ -345,9 +363,7 @@ class ProfileTopBar extends StatelessWidget {
             icon: Icons.menu_rounded,
             onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const SettingsScreen(),
-                ),
+                MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
               );
             },
           ),
@@ -580,10 +596,93 @@ class _LegacyProfileFollowersPreview extends StatelessWidget {
   }
 }
 
-class ProfileFollowersPreview extends StatelessWidget {
-  const ProfileFollowersPreview({super.key, required this.profile});
+class ProfileConnectionsSummary extends StatelessWidget {
+  const ProfileConnectionsSummary({
+    super.key,
+    required this.profile,
+    required this.onFollowersTap,
+    required this.onFollowingTap,
+  });
 
   final UserProfile profile;
+  final VoidCallback onFollowersTap;
+  final VoidCallback onFollowingTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
+      color: colorScheme.onSurfaceVariant,
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+    );
+
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 10,
+      runSpacing: 6,
+      children: [
+        SizedBox(
+          width: 72,
+          height: 28,
+          child: Stack(
+            children: List.generate(profileFollowerPreviewAssets.length, (
+              index,
+            ) {
+              return Positioned(
+                left: index * 18,
+                child: CircleAvatar(
+                  radius: 14,
+                  backgroundColor: colorScheme.surface,
+                  child: CircleAvatar(
+                    radius: 12,
+                    backgroundImage: AssetImage(
+                      profileFollowerPreviewAssets[index],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+        InkWell(
+          onTap: onFollowersTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: Text(
+              '${profile.followersCount} nguoi theo doi',
+              style: textStyle,
+            ),
+          ),
+        ),
+        InkWell(
+          onTap: onFollowingTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: Text(
+              '${profile.followingCount} dang theo doi',
+              style: textStyle,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class ProfileFollowersPreview extends StatelessWidget {
+  const ProfileFollowersPreview({
+    super.key,
+    required this.profile,
+    required this.onFollowersTap,
+    required this.onFollowingTap,
+  });
+
+  final UserProfile profile;
+  final VoidCallback onFollowersTap;
+  final VoidCallback onFollowingTap;
 
   @override
   Widget build(BuildContext context) {

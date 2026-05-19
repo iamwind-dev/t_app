@@ -133,6 +133,7 @@ class _ThreadReplyScreenState extends State<ThreadReplyScreen> {
             author: _currentUser,
             createdAt: 'vừa xong',
             content: request.primaryContent,
+            imageUrls: request.mediaUrls,
           );
           if (!mounted) {
             return;
@@ -152,10 +153,12 @@ class _ThreadReplyScreenState extends State<ThreadReplyScreen> {
             ? await _postsRepository.createPostReply(
                 postId: _rootThread.id,
                 content: request.primaryContent,
+                mediaUrls: request.mediaUrls,
               )
             : await _postsRepository.createChildReply(
                 replyId: targetThread.id,
                 content: request.primaryContent,
+                mediaUrls: request.mediaUrls,
               );
 
         if (!mounted) {

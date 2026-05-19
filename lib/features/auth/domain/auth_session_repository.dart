@@ -7,7 +7,19 @@ abstract interface class AuthSessionRepository {
     required String password,
   });
 
+  Future<AuthSession> register({
+    required String email,
+    required String username,
+    required String password,
+    required String displayName,
+  });
+
   Future<AuthUser?> loadCurrentUser();
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  });
 
   Future<void> logOut();
 }

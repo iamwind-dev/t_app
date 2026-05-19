@@ -70,6 +70,34 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
+  Future<void> register({
+    required String email,
+    required String username,
+    required String password,
+    required String displayName,
+  }) async {
+    emit(const AuthState(status: AuthStatus.loading));
+
+    try {
+      final session = await _repository.register(
+        email: email,
+        username: username,
+        password: password,
+        displayName: displayName,
+      );
+      emit(AuthState(status: AuthStatus.authenticated, user: session.user));
+    } on ApiException catch (error) {
+      emit(AuthState(status: AuthStatus.failure, errorMessage: error.message));
+    } catch (_) {
+      emit(
+        const AuthState(
+          status: AuthStatus.failure,
+          errorMessage: 'Không thể tạo tài khoản. Vui lòng thử lại.',
+        ),
+      );
+    }
+  }
+
   Future<void> logOut() async {
     await _repository.logOut();
     emit(const AuthState(status: AuthStatus.unauthenticated));

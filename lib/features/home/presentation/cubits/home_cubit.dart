@@ -55,7 +55,11 @@ class HomeCubit extends Cubit<HomeState> {
     }
   }
 
-  Future<void> createPost(String content) async {
+  /// Creates a new post and prepends it to the current feed.
+  Future<void> createPost(
+    String content, {
+    List<String> mediaUrls = const <String>[],
+  }) async {
     if (AppConfig.uiPreviewMode) {
       final trimmed = content.trim();
       if (trimmed.isEmpty) {
@@ -74,6 +78,7 @@ class HomeCubit extends Cubit<HomeState> {
         ),
         createdAt: 'vừa xong',
         content: trimmed,
+        imageUrls: mediaUrls,
       );
       emit(
         state.copyWith(
@@ -85,7 +90,10 @@ class HomeCubit extends Cubit<HomeState> {
       return;
     }
 
-    final post = await _repository.createPost(content: content);
+    final post = await _repository.createPost(
+      content: content,
+      mediaUrls: mediaUrls,
+    );
     emit(
       state.copyWith(
         status: HomeFeedStatus.loaded,

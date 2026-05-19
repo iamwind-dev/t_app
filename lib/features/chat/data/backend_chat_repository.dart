@@ -5,6 +5,8 @@ import 'chat_conversation.dart';
 import 'chat_message.dart';
 import 'chat_pages.dart';
 import 'chat_realtime_client.dart';
+import 'chat_seen_result.dart';
+import 'deleted_message_result.dart';
 
 class BackendChatRepository implements ChatRepository {
   const BackendChatRepository({
@@ -74,6 +76,33 @@ class BackendChatRepository implements ChatRepository {
     return ChatMessage.fromJson(_readObject(response, 'message'));
   }
 
+  @override
+  Future<ChatSeenResult> markSeen({
+    required String conversationId,
+    required String messageId,
+  }) async {
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      '/conversations/$conversationId/seen',
+      data: {'messageId': messageId},
+      decode: _asMap,
+    );
+
+    return ChatSeenResult.fromJson(response);
+  }
+
+  @override
+  Future<DeletedMessageResult> deleteMessage({
+    required String conversationId,
+    required String messageId,
+  }) async {
+    final response = await _apiClient.delete<Map<String, dynamic>>(
+      '/conversations/$conversationId/messages/$messageId',
+      decode: _asMap,
+    );
+
+    return DeletedMessageResult.fromJson(response);
+  }
+
   static Map<String, dynamic> _readObject(
     Map<String, dynamic> response,
     String key,
@@ -83,7 +112,7 @@ class BackendChatRepository implements ChatRepository {
       return value;
     }
 
-    throw FormatException('Phản hồi thiếu trường $key.');
+    throw FormatException('Response missing $key.');
   }
 
   static Map<String, dynamic> _asMap(Object? value) {
@@ -91,6 +120,6 @@ class BackendChatRepository implements ChatRepository {
       return value;
     }
 
-    throw const FormatException('Cần một đối tượng JSON.');
+    throw const FormatException('Expected a JSON object.');
   }
 }

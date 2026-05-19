@@ -27,6 +27,16 @@ class NotificationsRepository implements NotificationsActivityRepository {
   }
 
   @override
+  Future<int> getUnreadCount() async {
+    final response = await _apiClient.get<Map<String, dynamic>>(
+      '/notifications/unread-count',
+      decode: _asMap,
+    );
+
+    return response['unreadCount'] as int? ?? 0;
+  }
+
+  @override
   Future<NotificationRecord> markAsRead(String notificationId) async {
     final response = await _apiClient.patch<Map<String, dynamic>>(
       '/notifications/$notificationId/read',
@@ -52,9 +62,7 @@ class NotificationsRepository implements NotificationsActivityRepository {
       return notification;
     }
 
-    throw const FormatException(
-      'Phản hồi thông báo thiếu trường notification.',
-    );
+    throw const FormatException('Notification response missing notification.');
   }
 
   static Map<String, dynamic> _asMap(Object? value) {
@@ -62,6 +70,6 @@ class NotificationsRepository implements NotificationsActivityRepository {
       return value;
     }
 
-    throw const FormatException('Cần một đối tượng JSON.');
+    throw const FormatException('Expected a JSON object.');
   }
 }

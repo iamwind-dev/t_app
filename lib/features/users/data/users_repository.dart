@@ -3,6 +3,7 @@ import 'package:t_app/features/users/domain/users_profile_repository.dart';
 
 import 'user_posts_page.dart';
 import 'user_profile.dart';
+import 'user_profiles_page.dart';
 
 class UsersRepository implements UsersProfileRepository {
   const UsersRepository({required ApiClient apiClient})
@@ -40,7 +41,26 @@ class UsersRepository implements UsersProfileRepository {
   }
 
   @override
+  Future<UserProfilesPage> getFollowers(String userId, {String? cursor}) {
+    return _apiClient.get<UserProfilesPage>(
+      '/users/$userId/followers',
+      queryParameters: {'limit': 20, if (cursor != null) 'cursor': cursor},
+      decode: (value) => UserProfilesPage.fromJson(_asMap(value)),
+    );
+  }
+
+  @override
+  Future<UserProfilesPage> getFollowing(String userId, {String? cursor}) {
+    return _apiClient.get<UserProfilesPage>(
+      '/users/$userId/following',
+      queryParameters: {'limit': 20, if (cursor != null) 'cursor': cursor},
+      decode: (value) => UserProfilesPage.fromJson(_asMap(value)),
+    );
+  }
+
+  @override
   Future<UserProfile> updateMe({
+    String? username,
     String? displayName,
     String? bio,
     String? avatarUrl,
@@ -48,6 +68,7 @@ class UsersRepository implements UsersProfileRepository {
     final response = await _apiClient.patch<Map<String, dynamic>>(
       '/users/me',
       data: {
+        if (username != null) 'username': username,
         if (displayName != null) 'displayName': displayName,
         if (bio != null) 'bio': bio,
         if (avatarUrl != null) 'avatarUrl': avatarUrl,
@@ -84,7 +105,7 @@ class UsersRepository implements UsersProfileRepository {
       return user;
     }
 
-    throw const FormatException('Phản hồi người dùng thiếu trường user.');
+    throw const FormatException('User response missing user.');
   }
 
   static Map<String, dynamic> _asMap(Object? value) {
@@ -92,6 +113,6 @@ class UsersRepository implements UsersProfileRepository {
       return value;
     }
 
-    throw const FormatException('Cần một đối tượng JSON.');
+    throw const FormatException('Expected a JSON object.');
   }
 }

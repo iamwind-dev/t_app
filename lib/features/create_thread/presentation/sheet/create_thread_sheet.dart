@@ -1,9 +1,15 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:t_app/features/create_thread/data/models/thread_draft.dart';
 import 'package:t_app/features/create_thread/presentation/widget/ai_scanning_text.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 import 'package:t_app/features/post_detail/data/models/user.dart';
 import 'package:t_app/features/post_detail/presentation/widget/avatar_view.dart';
+import 'package:t_app/features/uploads/data/upload_image_result.dart';
+import 'package:t_app/features/uploads/domain/uploads_image_repository.dart';
 
 enum ComposerMode { create, reply }
 
@@ -38,11 +44,13 @@ class ThreadComposerSubmitRequest {
   const ThreadComposerSubmitRequest({
     required this.mode,
     required this.items,
+    this.mediaUrls = const <String>[],
     this.parentThreadId,
   });
 
   final ComposerMode mode;
   final List<String> items;
+  final List<String> mediaUrls;
   final String? parentThreadId;
 
   String get primaryContent =>
@@ -71,6 +79,8 @@ Future<void> showThreadComposerSheet({
   ThreadComposerReplyContext? replyContext,
   ThreadComposerSubmitCallback? onSubmit,
 }) {
+  final uploadsRepository = context.read<UploadsImageRepository>();
+
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -79,6 +89,7 @@ Future<void> showThreadComposerSheet({
     builder: (context) {
       return ThreadComposerSheet(
         currentUser: currentUser,
+        uploadsRepository: uploadsRepository,
         mode: mode,
         replyContext: replyContext,
         onSubmit: onSubmit,
@@ -93,12 +104,14 @@ class ThreadComposerSheet extends StatefulWidget {
   const ThreadComposerSheet({
     super.key,
     required this.currentUser,
+    required this.uploadsRepository,
     this.mode = ComposerMode.create,
     this.replyContext,
     this.onSubmit,
   });
 
   final User currentUser;
+  final UploadsImageRepository uploadsRepository;
   final ComposerMode mode;
   final ThreadComposerReplyContext? replyContext;
   final ThreadComposerSubmitCallback? onSubmit;
@@ -109,12 +122,17 @@ class ThreadComposerSheet extends StatefulWidget {
 
 class _ThreadComposerSheetState extends State<ThreadComposerSheet>
     with SingleTickerProviderStateMixin {
+  static const int _maxImageCount = 4;
+  static const int _maxImageBytes = 5 * 1024 * 1024;
+
   late ThreadDraft _draft;
   late List<TextEditingController> _controllers;
   late List<FocusNode> _focusNodes;
   bool _replyControlsEnabled = true;
   PostState _postState = PostState.idle;
   late AnimationController _scanController;
+  final ImagePicker _imagePicker = ImagePicker();
+  List<_ComposerImageAttachment> _imageAttachments = const [];
 
   bool get _isReplyMode => widget.mode == ComposerMode.reply;
 
@@ -150,6 +168,123 @@ class _ThreadComposerSheetState extends State<ThreadComposerSheet>
     });
   }
 
+  /// Opens the gallery and stages up to four images for the pending submit.
+  Future<void> _pickImages() async {
+    final remainingSlots = _maxImageCount - _imageAttachments.length;
+    if (remainingSlots <= 0) {
+      _showSubmitError('Ban chi co the dinh kem toi da 4 anh.');
+      return;
+    }
+
+    final pickedImages = await _imagePicker.pickMultiImage(
+      imageQuality: 85,
+      limit: remainingSlots,
+    );
+    if (!mounted || pickedImages.isEmpty) {
+      return;
+    }
+
+    final nextAttachments = <_ComposerImageAttachment>[
+      ..._imageAttachments,
+    ];
+    var hasInvalidType = false;
+    var hasOversizedFile = false;
+    for (final image in pickedImages) {
+      if (nextAttachments.length >= _maxImageCount) {
+        break;
+      }
+
+      final contentType = image.mimeType ?? _imageContentType(image.name);
+      if (!_isSupportedImageType(contentType)) {
+        hasInvalidType = true;
+        continue;
+      }
+
+      final fileSize = await image.length();
+      if (fileSize > _maxImageBytes) {
+        hasOversizedFile = true;
+        continue;
+      }
+
+      final bytes = await image.readAsBytes();
+      if (!mounted) {
+        return;
+      }
+
+      nextAttachments.add(
+        _ComposerImageAttachment(
+          fileName: image.name,
+          bytes: bytes,
+          contentType: contentType,
+        ),
+      );
+    }
+
+    setState(() {
+      _imageAttachments = nextAttachments;
+    });
+
+    if (hasInvalidType) {
+      _showSubmitError('Chi ho tro anh JPEG, PNG hoac WebP.');
+    } else if (hasOversizedFile) {
+      _showSubmitError('Moi anh phai nho hon 5MB.');
+    }
+  }
+
+  /// Removes one staged image before upload.
+  void _removeImageAttachmentAt(int index) {
+    setState(() {
+      _imageAttachments = [
+        ..._imageAttachments.take(index),
+        ..._imageAttachments.skip(index + 1),
+      ];
+    });
+  }
+
+  /// Uploads staged images one by one and returns the remote URLs for submit.
+  Future<List<String>> _uploadImageUrls() async {
+    final uploadType = _isReplyMode
+        ? UploadImageType.reply
+        : UploadImageType.post;
+    final urls = <String>[];
+
+    for (final attachment in _imageAttachments) {
+      final upload = await widget.uploadsRepository.uploadImage(
+        fileName: attachment.fileName,
+        bytes: attachment.bytes,
+        contentType: attachment.contentType,
+        type: uploadType,
+      );
+      urls.add(upload.secureUrl);
+    }
+
+    return urls;
+  }
+
+  /// Maps a picked image extension to the multipart MIME type expected by Dio.
+  String _imageContentType(String fileName) {
+    final lowerName = fileName.toLowerCase();
+    if (lowerName.endsWith('.png')) {
+      return 'image/png';
+    }
+    if (lowerName.endsWith('.webp')) {
+      return 'image/webp';
+    }
+
+    return 'image/jpeg';
+  }
+
+  bool _isSupportedImageType(String contentType) {
+    return contentType == 'image/jpeg' ||
+        contentType == 'image/png' ||
+        contentType == 'image/webp';
+  }
+
+  /// Shows a short failure message when local picking or remote upload fails.
+  void _showSubmitError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   /// Adds a new block only when the composer is in create mode.
   void _addDraftItem() {
     if (_isReplyMode) {
@@ -176,7 +311,7 @@ class _ThreadComposerSheetState extends State<ThreadComposerSheet>
     });
   }
 
-  /// Runs the existing mock posting flow and delegates the final submit action.
+  /// Uploads staged media first, then delegates the final post or reply submit.
   Future<void> _submit() async {
     if (_postState != PostState.idle) {
       return;
@@ -190,45 +325,68 @@ class _ThreadComposerSheetState extends State<ThreadComposerSheet>
       return;
     }
 
-    setState(() {
-      _postState = PostState.aiChecking;
-    });
-    _scanController.forward(from: 0.0);
+    try {
+      setState(() {
+        _postState = PostState.aiChecking;
+      });
+      _scanController.forward(from: 0.0);
 
-    await Future<void>.delayed(const Duration(milliseconds: 800));
-    if (!mounted) {
-      return;
-    }
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      if (!mounted) {
+        return;
+      }
 
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    if (!mounted) {
-      return;
-    }
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+      if (!mounted) {
+        return;
+      }
 
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    if (!mounted) {
-      return;
-    }
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+      if (!mounted) {
+        return;
+      }
 
-    setState(() {
-      _postState = PostState.postingSuccess;
-    });
+      List<String> mediaUrls = const <String>[];
+      if (_imageAttachments.isNotEmpty) {
+        mediaUrls = await _uploadImageUrls();
+      }
+      if (!mounted) {
+        return;
+      }
 
-    if (widget.onSubmit != null) {
-      await widget.onSubmit!(
-        ThreadComposerSubmitRequest(
-          mode: widget.mode,
-          items: items,
-          parentThreadId: widget.replyContext?.parentThreadId,
-        ),
+      if (widget.onSubmit != null) {
+        await widget.onSubmit!(
+          ThreadComposerSubmitRequest(
+            mode: widget.mode,
+            items: items,
+            mediaUrls: mediaUrls,
+            parentThreadId: widget.replyContext?.parentThreadId,
+          ),
+        );
+      }
+
+      setState(() {
+        _postState = PostState.postingSuccess;
+      });
+
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pop();
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _postState = PostState.idle;
+      });
+      _showSubmitError(
+        _imageAttachments.isNotEmpty
+            ? 'Khong the tai anh len luc nay.'
+            : 'Khong the dang bai luc nay.',
       );
     }
-
-    await Future<void>.delayed(const Duration(milliseconds: 1200));
-    if (!mounted) {
-      return;
-    }
-    Navigator.of(context).pop();
   }
 
   @override
@@ -262,13 +420,16 @@ class _ThreadComposerSheetState extends State<ThreadComposerSheet>
                 ),
                 Divider(height: 1, color: theme.dividerColor),
                 Expanded(
-                  child: ThreadDraftComposer(
+                  child: _ThreadDraftComposer(
                     currentUser: widget.currentUser,
                     draft: _draft,
                     controllers: _controllers,
                     focusNodes: _focusNodes,
                     onChanged: _updateDraftItem,
                     onAddToThread: _addDraftItem,
+                    imageAttachments: _imageAttachments,
+                    onPickImages: _pickImages,
+                    onRemoveImageAttachment: _removeImageAttachmentAt,
                     postState: _postState,
                     scanController: _scanController,
                     mode: widget.mode,
@@ -358,8 +519,8 @@ class ThreadComposerHeader extends StatelessWidget {
   }
 }
 
-class ThreadDraftComposer extends StatelessWidget {
-  const ThreadDraftComposer({
+class _ThreadDraftComposer extends StatelessWidget {
+  const _ThreadDraftComposer({
     super.key,
     required this.currentUser,
     required this.draft,
@@ -367,6 +528,9 @@ class ThreadDraftComposer extends StatelessWidget {
     required this.focusNodes,
     required this.onChanged,
     required this.onAddToThread,
+    required this.imageAttachments,
+    required this.onPickImages,
+    required this.onRemoveImageAttachment,
     required this.postState,
     required this.scanController,
     required this.mode,
@@ -379,6 +543,9 @@ class ThreadDraftComposer extends StatelessWidget {
   final List<FocusNode> focusNodes;
   final void Function(int index, String value) onChanged;
   final VoidCallback onAddToThread;
+  final List<_ComposerImageAttachment> imageAttachments;
+  final Future<void> Function() onPickImages;
+  final void Function(int index) onRemoveImageAttachment;
   final PostState postState;
   final AnimationController scanController;
   final ComposerMode mode;
@@ -394,13 +561,17 @@ class ThreadDraftComposer extends StatelessWidget {
           const SizedBox(height: 18),
         ],
         for (var index = 0; index < draft.items.length; index++)
-          ThreadDraftItemComposer(
+          _ThreadDraftItemComposer(
             currentUser: currentUser,
             controller: controllers[index],
             focusNode: focusNodes[index],
             isLastItem: index == draft.items.length - 1,
+            showMediaComposer: index == 0,
             onChanged: (value) => onChanged(index, value),
             onAddToThread: onAddToThread,
+            imageAttachments: imageAttachments,
+            onPickImages: onPickImages,
+            onRemoveImageAttachment: onRemoveImageAttachment,
             postState: postState,
             scanController: scanController,
             mode: mode,
@@ -485,15 +656,19 @@ class ReplyContextPreview extends StatelessWidget {
   }
 }
 
-class ThreadDraftItemComposer extends StatelessWidget {
-  const ThreadDraftItemComposer({
+class _ThreadDraftItemComposer extends StatelessWidget {
+  const _ThreadDraftItemComposer({
     super.key,
     required this.currentUser,
     required this.controller,
     required this.focusNode,
     required this.isLastItem,
+    required this.showMediaComposer,
     required this.onChanged,
     required this.onAddToThread,
+    required this.imageAttachments,
+    required this.onPickImages,
+    required this.onRemoveImageAttachment,
     required this.postState,
     required this.scanController,
     required this.mode,
@@ -503,8 +678,12 @@ class ThreadDraftItemComposer extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool isLastItem;
+  final bool showMediaComposer;
   final ValueChanged<String> onChanged;
   final VoidCallback onAddToThread;
+  final List<_ComposerImageAttachment> imageAttachments;
+  final Future<void> Function() onPickImages;
+  final void Function(int index) onRemoveImageAttachment;
   final PostState postState;
   final AnimationController scanController;
   final ComposerMode mode;
@@ -601,7 +780,14 @@ class ThreadDraftItemComposer extends StatelessWidget {
                         ),
                 ),
                 const SizedBox(height: 12),
-                const ComposerToolbar(),
+                ComposerToolbar(onPickImages: onPickImages),
+                if (showMediaComposer && imageAttachments.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _ComposerImageStrip(
+                    attachments: imageAttachments,
+                    onRemoveImage: onRemoveImageAttachment,
+                  ),
+                ],
                 if (mode == ComposerMode.create && isLastItem) ...[
                   const SizedBox(height: 14),
                   AddToThreadRow(
@@ -619,7 +805,7 @@ class ThreadDraftItemComposer extends StatelessWidget {
 }
 
 class ComposerToolbar extends StatelessWidget {
-  const ComposerToolbar({super.key});
+  const ComposerToolbar({super.key, required this.onPickImages});
 
   static const _icons = [
     Icons.image_outlined,
@@ -629,21 +815,109 @@ class ComposerToolbar extends StatelessWidget {
     Icons.more_horiz_rounded,
   ];
 
+  final Future<void> Function() onPickImages;
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Row(
       children: List.generate(_icons.length, (index) {
-        return Padding(
-          padding: EdgeInsets.only(right: index == _icons.length - 1 ? 0 : 18),
-          child: Icon(
-            _icons[index],
-            size: 22,
-            color: colorScheme.onSurfaceVariant,
+        return GestureDetector(
+          onTap: index == 0 ? () => onPickImages() : null,
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: EdgeInsets.only(
+              right: index == _icons.length - 1 ? 0 : 18,
+            ),
+            child: Icon(
+              _icons[index],
+              size: 22,
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
         );
       }),
+    );
+  }
+}
+
+class _ComposerImageStrip extends StatelessWidget {
+  const _ComposerImageStrip({
+    super.key,
+    required this.attachments,
+    required this.onRemoveImage,
+  });
+
+  final List<_ComposerImageAttachment> attachments;
+  final void Function(int index) onRemoveImage;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 92,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: attachments.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          return _ComposerImageCard(
+            attachment: attachments[index],
+            onRemove: () => onRemoveImage(index),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ComposerImageCard extends StatelessWidget {
+  const _ComposerImageCard({
+    super.key,
+    required this.attachment,
+    required this.onRemove,
+  });
+
+  final _ComposerImageAttachment attachment;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Image.memory(
+            attachment.bytes,
+            width: 92,
+            height: 92,
+            fit: BoxFit.cover,
+          ),
+        ),
+        Positioned(
+          top: 6,
+          right: 6,
+          child: GestureDetector(
+            onTap: onRemove,
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              width: 26,
+              height: 26,
+              decoration: BoxDecoration(
+                color: colorScheme.surface.withValues(alpha: 0.92),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.close_rounded,
+                size: 16,
+                color: colorScheme.onSurface,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -834,4 +1108,16 @@ class ThreadComposerFooter extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ComposerImageAttachment {
+  const _ComposerImageAttachment({
+    required this.fileName,
+    required this.bytes,
+    required this.contentType,
+  });
+
+  final String fileName;
+  final Uint8List bytes;
+  final String contentType;
 }
