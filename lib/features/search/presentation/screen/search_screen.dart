@@ -94,7 +94,7 @@ class _HeaderSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Search', style: SearchTokens.title(context)),
+            Text('Tìm kiếm', style: SearchTokens.title(context)),
             const SizedBox(height: SearchTokens.titleToSearchGap),
             Container(
               padding: const EdgeInsets.symmetric(
@@ -131,7 +131,7 @@ class _HeaderSection extends StatelessWidget {
                       textInputAction: TextInputAction.search,
                       onSubmitted: onSubmitted,
                       decoration: InputDecoration(
-                        hintText: 'Search',
+                        hintText: 'Tìm kiếm',
                         hintStyle: SearchTokens.searchHint(context),
                         border: InputBorder.none,
                         isDense: true,
@@ -180,7 +180,7 @@ class _SearchResults {
       case SearchUsersStatus.failure:
         return [
           _SearchMessage(
-            message: state.errorMessage ?? 'Unable to search users.',
+            message: state.errorMessage ?? 'Không thể tìm kiếm người dùng.',
           ),
         ];
       case SearchUsersStatus.empty:
@@ -195,7 +195,7 @@ class _SearchResults {
       userId: profile.id,
       handle: profile.username,
       subtitle: profile.displayName,
-      followers: '${profile.followersCount} followers',
+      followers: '${profile.followersCount} người theo dõi',
       isFollowing: profile.isFollowing,
       avatarUrl: profile.avatarUrl,
       topPadding: SearchTokens.firstTileTopPadding,

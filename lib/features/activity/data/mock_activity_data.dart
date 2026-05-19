@@ -123,7 +123,7 @@ const activityItems = [
     type: ActivityItemType.contentRecommendation,
     user: _tlat,
     timestampLabel: '28/3/26',
-    subtitle: 'Thread gợi ý',
+    subtitle: 'Chủ đề gợi ý',
     contentPreview: 'Oy cái theme messenger mới xinh v 🤣',
     mediaThumbnail: 'assets/images/home_post_sample.jpg',
     likeCount: 0,

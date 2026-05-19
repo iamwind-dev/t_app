@@ -53,7 +53,7 @@ class NotificationsRepository implements NotificationsActivityRepository {
     }
 
     throw const FormatException(
-      'Notification response is missing notification.',
+      'Phản hồi thông báo thiếu trường notification.',
     );
   }
 
@@ -62,6 +62,6 @@ class NotificationsRepository implements NotificationsActivityRepository {
       return value;
     }
 
-    throw const FormatException('Expected a JSON object.');
+    throw const FormatException('Cần một đối tượng JSON.');
   }
 }

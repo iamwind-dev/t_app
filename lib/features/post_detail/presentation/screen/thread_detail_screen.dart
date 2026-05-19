@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:t_app/core/config/app_config.dart';
 import 'package:t_app/features/create_thread/presentation/sheet/create_thread_sheet.dart';
 import 'package:t_app/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:t_app/features/home/presentation/widget/post_divider.dart';
@@ -46,6 +47,10 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   }
 
   Future<void> _loadThread() async {
+    if (AppConfig.uiPreviewMode) {
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -89,6 +94,13 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
       return;
     }
 
+    if (AppConfig.uiPreviewMode) {
+      setState(() {
+        _expandedThreadIds.add(thread.id);
+      });
+      return;
+    }
+
     if (thread.children.isNotEmpty || thread.replyCount == 0) {
       setState(() {
         _expandedThreadIds.add(thread.id);
@@ -114,9 +126,9 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to load replies.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Không thể tải phản hồi.')));
     }
   }
 
@@ -129,6 +141,31 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
       replyContext: ThreadComposerReplyContext.fromThread(targetThread),
       onSubmit: (request) async {
         if (request.primaryContent.isEmpty) {
+          return;
+        }
+
+        if (AppConfig.uiPreviewMode) {
+          final replyId =
+              'preview_reply_${DateTime.now().microsecondsSinceEpoch}';
+          final newReply = ThreadItemModel(
+            id: replyId,
+            parentId: targetThread.id,
+            rootThreadId: _rootThread.id,
+            author: _currentUser,
+            createdAt: 'vừa xong',
+            content: request.primaryContent,
+          );
+          if (!mounted) {
+            return;
+          }
+          setState(() {
+            _rootThread = _insertReply(
+              current: _rootThread,
+              targetId: targetThread.id,
+              newReply: newReply,
+            );
+            _expandedThreadIds.add(targetThread.id);
+          });
           return;
         }
 
@@ -158,6 +195,22 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   }
 
   Future<void> _toggleLike(ThreadItemModel thread) async {
+    if (AppConfig.uiPreviewMode) {
+      setState(() {
+        _rootThread = _replaceThread(
+          current: _rootThread,
+          targetId: thread.id,
+          update: (target) => target.copyWith(
+            likesCount: target.isLikedByMe
+                ? (target.likesCount > 0 ? target.likesCount - 1 : 0)
+                : target.likesCount + 1,
+            isLikedByMe: !target.isLikedByMe,
+          ),
+        );
+      });
+      return;
+    }
+
     final isRootPost = thread.id == _rootThread.id;
     final result = isRootPost
         ? (thread.isLikedByMe
@@ -243,7 +296,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
       appBar: AppBar(
         backgroundColor: colorScheme.surface,
         surfaceTintColor: Colors.transparent,
-        title: const Text('Thread'),
+        title: const Text('Chủ đề'),
       ),
       body: SafeArea(
         child: Column(
@@ -266,7 +319,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
                     child: Text(
-                      'Phan hoi (${_rootThread.replyCount})',
+                      'Phản hồi (${_rootThread.replyCount})',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -338,7 +391,7 @@ class _ThreadComposer extends StatelessWidget {
                       borderRadius: BorderRadius.circular(18),
                     ),
                     child: Text(
-                      'Tra loi $username',
+                      'Trả lời $username',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),

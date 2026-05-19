@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:t_app/core/config/app_config.dart';
 import 'package:t_app/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:t_app/features/create_thread/presentation/sheet/create_thread_sheet.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
@@ -56,6 +57,13 @@ class _ThreadReplyScreenState extends State<ThreadReplyScreen> {
       return;
     }
 
+    if (AppConfig.uiPreviewMode) {
+      setState(() {
+        _expandedThreadIds.add(thread.id);
+      });
+      return;
+    }
+
     if (thread.children.isNotEmpty || thread.replyCount == 0) {
       setState(() {
         _expandedThreadIds.add(thread.id);
@@ -81,9 +89,9 @@ class _ThreadReplyScreenState extends State<ThreadReplyScreen> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to load replies.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Không thể tải phản hồi.')));
     }
   }
 
@@ -115,6 +123,31 @@ class _ThreadReplyScreenState extends State<ThreadReplyScreen> {
           return;
         }
 
+        if (AppConfig.uiPreviewMode) {
+          final replyId =
+              'preview_reply_${DateTime.now().microsecondsSinceEpoch}';
+          final newReply = ThreadItemModel(
+            id: replyId,
+            parentId: targetThread.id,
+            rootThreadId: _rootThread.id,
+            author: _currentUser,
+            createdAt: 'vừa xong',
+            content: request.primaryContent,
+          );
+          if (!mounted) {
+            return;
+          }
+          setState(() {
+            _rootThread = _insertReply(
+              current: _rootThread,
+              targetId: targetThread.id,
+              newReply: newReply,
+            );
+            _expandedThreadIds.add(targetThread.id);
+          });
+          return;
+        }
+
         final newReply = targetThread.id == _rootThread.id
             ? await _postsRepository.createPostReply(
                 postId: _rootThread.id,
@@ -142,6 +175,22 @@ class _ThreadReplyScreenState extends State<ThreadReplyScreen> {
   }
 
   Future<void> _toggleLike(ThreadItemModel thread) async {
+    if (AppConfig.uiPreviewMode) {
+      setState(() {
+        _rootThread = _replaceThread(
+          current: _rootThread,
+          targetId: thread.id,
+          update: (target) => target.copyWith(
+            likesCount: target.isLikedByMe
+                ? (target.likesCount > 0 ? target.likesCount - 1 : 0)
+                : target.likesCount + 1,
+            isLikedByMe: !target.isLikedByMe,
+          ),
+        );
+      });
+      return;
+    }
+
     final isRootPost = thread.id == _rootThread.id;
     final result = isRootPost
         ? (thread.isLikedByMe
@@ -230,7 +279,7 @@ class _ThreadReplyScreenState extends State<ThreadReplyScreen> {
       appBar: AppBar(
         backgroundColor: colorScheme.surface,
         surfaceTintColor: Colors.transparent,
-        title: const Text('Reply'),
+        title: const Text('Trả lời'),
       ),
       body: SafeArea(
         child: Column(
@@ -344,7 +393,7 @@ class _ThreadBranchComposer extends StatelessWidget {
                       borderRadius: BorderRadius.circular(18),
                     ),
                     child: Text(
-                      'Tra loi ${selectedThread.author.username}',
+                      'Trả lời ${selectedThread.author.username}',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),

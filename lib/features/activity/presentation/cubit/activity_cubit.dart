@@ -1,5 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:t_app/core/config/app_config.dart';
 import 'package:t_app/core/network/api_exception.dart';
+import 'package:t_app/features/activity/data/mock_activity_data.dart';
 import 'package:t_app/features/activity/data/models/activity_item_model.dart';
 import 'package:t_app/features/activity/domain/notifications_activity_repository.dart';
 import 'package:t_app/features/users/domain/users_profile_repository.dart';
@@ -12,12 +14,22 @@ class ActivityCubit extends Cubit<ActivityState> {
     required UsersProfileRepository usersRepository,
   }) : _notificationsRepository = notificationsRepository,
        _usersRepository = usersRepository,
-      super(const ActivityState());
+       super(const ActivityState());
 
   final NotificationsActivityRepository _notificationsRepository;
   final UsersProfileRepository _usersRepository;
 
   Future<void> loadNotifications() async {
+    if (AppConfig.uiPreviewMode) {
+      emit(
+        const ActivityState(
+          status: ActivityStatus.loaded,
+          items: activityItems,
+        ),
+      );
+      return;
+    }
+
     emit(state.copyWith(status: ActivityStatus.loading, clearError: true));
 
     try {
@@ -43,7 +55,7 @@ class ActivityCubit extends Cubit<ActivityState> {
       emit(
         state.copyWith(
           status: ActivityStatus.failure,
-          errorMessage: 'Unable to load activity.',
+          errorMessage: 'Không thể tải hoạt động.',
         ),
       );
     }
@@ -51,6 +63,22 @@ class ActivityCubit extends Cubit<ActivityState> {
 
   Future<void> toggleFollow(ActivityItemModel item) async {
     if (item.type != ActivityItemType.followSuggestion) {
+      return;
+    }
+
+    if (AppConfig.uiPreviewMode) {
+      emit(
+        state.copyWith(
+          items: state.items
+              .map(
+                (current) => current.id == item.id
+                    ? current.copyWith(isFollowed: !current.isFollowed)
+                    : current,
+              )
+              .toList(growable: false),
+          clearError: true,
+        ),
+      );
       return;
     }
 
@@ -74,7 +102,7 @@ class ActivityCubit extends Cubit<ActivityState> {
     } on ApiException catch (error) {
       emit(state.copyWith(errorMessage: error.message));
     } catch (_) {
-      emit(state.copyWith(errorMessage: 'Unable to update follow.'));
+      emit(state.copyWith(errorMessage: 'Không thể cập nhật theo dõi.'));
     }
   }
 }

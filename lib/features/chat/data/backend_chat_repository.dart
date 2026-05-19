@@ -83,7 +83,7 @@ class BackendChatRepository implements ChatRepository {
       return value;
     }
 
-    throw FormatException('Response is missing $key.');
+    throw FormatException('Phản hồi thiếu trường $key.');
   }
 
   static Map<String, dynamic> _asMap(Object? value) {
@@ -91,6 +91,6 @@ class BackendChatRepository implements ChatRepository {
       return value;
     }
 
-    throw const FormatException('Expected a JSON object.');
+    throw const FormatException('Cần một đối tượng JSON.');
   }
 }

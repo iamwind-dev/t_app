@@ -40,6 +40,32 @@ class UserProfile extends Equatable {
   final bool isFollowing;
   final List<String> tags;
 
+  UserProfile copyWith({
+    String? id,
+    String? username,
+    String? displayName,
+    String? bio,
+    String? avatarUrl,
+    int? followersCount,
+    int? followingCount,
+    int? postCount,
+    bool? isFollowing,
+    List<String>? tags,
+  }) {
+    return UserProfile(
+      id: id ?? this.id,
+      username: username ?? this.username,
+      displayName: displayName ?? this.displayName,
+      bio: bio ?? this.bio,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      followersCount: followersCount ?? this.followersCount,
+      followingCount: followingCount ?? this.followingCount,
+      postCount: postCount ?? this.postCount,
+      isFollowing: isFollowing ?? this.isFollowing,
+      tags: tags ?? this.tags,
+    );
+  }
+
   @override
   List<Object?> get props => [
     id,

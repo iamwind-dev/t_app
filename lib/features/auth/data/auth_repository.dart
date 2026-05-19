@@ -45,7 +45,7 @@ class AuthRepository implements AuthSessionRepository {
       );
       final userJson = response['user'];
       if (userJson is! Map<String, dynamic>) {
-        throw const FormatException('Current user response is missing user.');
+        throw const FormatException('Phản hồi người dùng hiện tại thiếu user.');
       }
 
       return AuthUser.fromJson(userJson);
@@ -69,6 +69,6 @@ class AuthRepository implements AuthSessionRepository {
       return value;
     }
 
-    throw const FormatException('Expected a JSON object.');
+    throw const FormatException('Cần một đối tượng JSON.');
   }
 }

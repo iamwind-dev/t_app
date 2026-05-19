@@ -11,6 +11,7 @@ import 'package:t_app/features/post_detail/data/models/user.dart';
 import 'package:t_app/features/post_detail/presentation/screen/thread_detail_screen.dart';
 import 'package:t_app/features/post_detail/presentation/screen/thread_reply_screen.dart';
 import 'package:t_app/features/profile/presentation/screen/profile_screen.dart';
+import 'package:t_app/features/reels/presentation/pages/reels_page.dart';
 import 'package:t_app/features/search/presentation/screen/search_screen.dart';
 
 import '../cubits/home_cubit.dart';
@@ -108,10 +109,10 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() => _isChatOpen = false);
     }
 
-    if (index == 2) {
-      _openCreateThreadSheet(state);
-      return;
-    }
+    // if (index == 2) {
+    //   _openCreateThreadSheet(state);
+    //   return;
+    // }
 
     context.read<HomeCubit>().changeTab(index);
   }
@@ -148,11 +149,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return BlocBuilder<HomeCubit, HomeState>(
       builder: (context, state) {
         final isSearchTab = state.selectedTabIndex == 1;
+        final isReelsTab = state.selectedTabIndex == 2;
         final isActivityTab = state.selectedTabIndex == 3;
         final isProfileTab = state.selectedTabIndex == 4;
         final shouldShowBottomBar =
             _isChatOpen ||
             isSearchTab ||
+          isReelsTab ||
             isActivityTab ||
             isProfileTab ||
             _isBottomBarVisible;
@@ -175,9 +178,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     SearchScreen(bottomPadding: _bottomSpace(context))
                   else if (isActivityTab)
                     ActivityScreen(bottomPadding: _bottomSpace(context))
+                  else if (isReelsTab)
+                    ReelsPage(bottomPadding: _bottomSpace(context))
                   else if (isProfileTab)
                     currentUser == null
-                        ? const Center(child: Text('Profile is unavailable.'))
+                        ? const Center(child: Text('Không thể tải hồ sơ.'))
                         : ProfileScreen(
                             userId: currentUser.id,
                             bottomPadding: _bottomSpace(context),
@@ -235,6 +240,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   if (!_isChatOpen &&
                       !isSearchTab &&
+                      !isReelsTab &&
                       !isActivityTab &&
                       !isProfileTab)
                     Positioned(
@@ -305,7 +311,7 @@ class _ChatButton extends StatelessWidget {
         border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: IconButton(
-        tooltip: 'Chat',
+        tooltip: 'Tin nhắn',
         icon: const Icon(Icons.chat_bubble_outline_rounded, size: 20),
         color: colorScheme.onSurface,
         onPressed: onTap,
@@ -335,7 +341,7 @@ class _ThemeModeMenuButton extends StatelessWidget {
       ),
       child: PopupMenuButton<ThemeMode>(
         key: const Key('theme_mode_menu_button'),
-        tooltip: 'Theme mode',
+        tooltip: 'Chế độ giao diện',
         initialValue: selectedThemeMode,
         onSelected: onSelected,
         icon: Icon(
@@ -347,19 +353,19 @@ class _ThemeModeMenuButton extends StatelessWidget {
           _buildThemeModeItem(
             context,
             value: ThemeMode.system,
-            label: 'System',
+            label: 'Theo hệ thống',
             selectedThemeMode: selectedThemeMode,
           ),
           _buildThemeModeItem(
             context,
             value: ThemeMode.light,
-            label: 'Light',
+            label: 'Sáng',
             selectedThemeMode: selectedThemeMode,
           ),
           _buildThemeModeItem(
             context,
             value: ThemeMode.dark,
-            label: 'Dark',
+            label: 'Tối',
             selectedThemeMode: selectedThemeMode,
           ),
         ],

@@ -41,7 +41,7 @@ class _ThreadRepliesSectionState extends State<ThreadRepliesSection> {
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(
-          'Chua co phan hoi nao cho thread nay.',
+          'Chưa có phản hồi nào cho chủ đề này.',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
       );

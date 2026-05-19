@@ -8,7 +8,7 @@ class NotificationPage {
     final pageInfoJson = json['pageInfo'];
 
     if (itemsJson is! List || pageInfoJson is! Map<String, dynamic>) {
-      throw const FormatException('Invalid notifications page.');
+      throw const FormatException('Trang thông báo không hợp lệ.');
     }
 
     return NotificationPage(

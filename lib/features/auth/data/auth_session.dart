@@ -8,12 +8,12 @@ class AuthSession extends Equatable {
   factory AuthSession.fromJson(Map<String, dynamic> json) {
     final userJson = json['user'];
     if (userJson is! Map<String, dynamic>) {
-      throw const FormatException('Auth response is missing user.');
+      throw const FormatException('Phản hồi đăng nhập thiếu trường user.');
     }
 
     final accessToken = json['accessToken'];
     if (accessToken is! String || accessToken.isEmpty) {
-      throw const FormatException('Auth response is missing accessToken.');
+      throw const FormatException('Phản hồi đăng nhập thiếu accessToken.');
     }
 
     return AuthSession(

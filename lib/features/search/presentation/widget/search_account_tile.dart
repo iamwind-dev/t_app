@@ -178,7 +178,7 @@ class _FollowButton extends StatelessWidget {
             vertical: SearchTokens.followVerticalPadding,
           ),
           child: Text(
-            item.isFollowing ? 'Following' : 'Follow',
+            item.isFollowing ? 'Đang theo dõi' : 'Theo dõi',
             style: SearchTokens.follow(context),
           ),
         ),

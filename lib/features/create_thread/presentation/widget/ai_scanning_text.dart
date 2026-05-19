@@ -128,7 +128,7 @@ class _InlineIndicatorState extends State<_InlineIndicator>
           Icon(Icons.auto_awesome, size: 14, color: colorScheme.primary),
           const SizedBox(width: 4),
           Text(
-            'AI detection...',
+            'AI đang kiểm tra...',
             style: TextStyle(
               color: colorScheme.primary,
               fontSize: 12,

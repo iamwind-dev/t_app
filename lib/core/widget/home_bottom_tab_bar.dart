@@ -32,8 +32,8 @@ class HomeBottomTabBar extends StatelessWidget {
       deselectedAsset: 'assets/icons/bottom/Light=Search_Deselect.png',
     ),
     _BottomTabIcon(
-      selectedAsset: 'assets/icons/bottom/Light=Write_Select.png',
-      deselectedAsset: 'assets/icons/bottom/Light=Write_Deselect.png',
+      selectedAsset: 'assets/icons/bottom/Light=Reel_Select.png',
+      deselectedAsset: 'assets/icons/bottom/Light=Reel_Deselect.png',
     ),
     _BottomTabIcon(
       selectedAsset: 'assets/icons/bottom/Light=Activity_Select.png',

@@ -73,8 +73,8 @@ class SocketIoChatRealtimeClient
 
     final token = await _tokenStore.readToken();
     if (token == null || token.isEmpty) {
-      _debug('Socket.IO connect blocked: missing auth token.');
-      throw const ApiException(message: 'Authentication is required.');
+      _debug('Socket.IO không thể kết nối: thiếu token đăng nhập.');
+      throw const ApiException(message: 'Cần đăng nhập để tiếp tục.');
     }
 
     _connectionStatusController.add(ChatConnectionStatus.connecting);
@@ -105,7 +105,7 @@ class SocketIoChatRealtimeClient
         _connectionStatusController.add(ChatConnectionStatus.disconnected);
         if (!completer.isCompleted) {
           completer.completeError(
-            ApiException(message: 'Unable to connect chat: $error'),
+            ApiException(message: 'Không thể kết nối tin nhắn: $error'),
           );
         }
       })
@@ -115,7 +115,7 @@ class SocketIoChatRealtimeClient
       const Duration(seconds: 10),
       onTimeout: () {
         _debug('Socket.IO connect timed out after 10 seconds.');
-        throw const ApiException(message: 'Unable to connect chat.');
+        throw const ApiException(message: 'Không thể kết nối tin nhắn.');
       },
     );
   }
@@ -176,7 +176,7 @@ class SocketIoChatRealtimeClient
     );
     final message = data['message'];
     if (message is! Map<String, dynamic>) {
-      throw const ApiException(message: 'Chat response is missing message.');
+      throw const ApiException(message: 'Phản hồi tin nhắn thiếu nội dung.');
     }
 
     final returnedClientId =
@@ -229,7 +229,7 @@ class SocketIoChatRealtimeClient
     final socket = _socket;
     if (socket == null) {
       _debug('Socket.IO emit blocked for $event: socket is unavailable.');
-      throw const ApiException(message: 'Chat socket is unavailable.');
+      throw const ApiException(message: 'Kết nối tin nhắn không khả dụng.');
     }
 
     final completer = Completer<Map<String, dynamic>>();
@@ -250,14 +250,16 @@ class SocketIoChatRealtimeClient
       const Duration(seconds: 10),
       onTimeout: () {
         _debug('Socket.IO $event timed out after 10 seconds.');
-        throw const ApiException(message: 'Chat request timed out.');
+        throw const ApiException(
+          message: 'Yêu cầu tin nhắn đã quá thời gian chờ.',
+        );
       },
     );
   }
 
   Map<String, dynamic> _readAckData(Object? response) {
     if (response is! Map) {
-      throw const ApiException(message: 'Invalid chat response.');
+      throw const ApiException(message: 'Phản hồi tin nhắn không hợp lệ.');
     }
 
     final ack = Map<String, dynamic>.from(response);
@@ -274,11 +276,11 @@ class SocketIoChatRealtimeClient
       final errorMap = Map<String, dynamic>.from(error);
       throw ApiException(
         code: errorMap['code'] as String?,
-        message: errorMap['message'] as String? ?? 'Chat request failed.',
+        message: errorMap['message'] as String? ?? 'Yêu cầu tin nhắn thất bại.',
       );
     }
 
-    throw const ApiException(message: 'Chat request failed.');
+    throw const ApiException(message: 'Yêu cầu tin nhắn thất bại.');
   }
 
   void _debug(String message) {
@@ -378,7 +380,7 @@ class SocketIoChatRealtimeClient
     return ChatMessageFailedEvent(
       conversationId: conversationId,
       clientTempId: clientTempId,
-      message: error?['message'] as String? ?? 'Chat request failed.',
+      message: error?['message'] as String? ?? 'Yêu cầu tin nhắn thất bại.',
     );
   }
 

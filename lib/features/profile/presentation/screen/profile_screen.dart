@@ -17,6 +17,7 @@ import 'package:t_app/features/post_detail/presentation/widget/thread_item_widge
 import 'package:t_app/features/profile/data/profile_mock_data.dart';
 import 'package:t_app/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:t_app/features/profile/presentation/cubit/profile_state.dart';
+import 'package:t_app/features/settings/presentation/screen/settings_screen.dart';
 import 'package:t_app/features/uploads/data/upload_image_result.dart';
 import 'package:t_app/features/uploads/domain/uploads_image_repository.dart';
 import 'package:t_app/features/users/data/user_profile.dart';
@@ -61,7 +62,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
   static const _tabs = [
-    'Thread',
+    'Chủ đề',
     'Câu trả lời',
     'File phương tiện',
     'Bài đăng lại',
@@ -139,7 +140,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                state.errorMessage ?? 'Unable to open conversation.',
+                state.errorMessage ?? 'Không thể mở cuộc trò chuyện.',
               ),
             ),
           );
@@ -186,12 +187,12 @@ class _ProfileScreenState extends State<ProfileScreen>
 
           if (state.status == ProfileStatus.failure && profile == null) {
             return _ProfileMessage(
-              message: state.errorMessage ?? 'Unable to load profile.',
+              message: state.errorMessage ?? 'Không thể tải hồ sơ.',
             );
           }
 
           if (profile == null) {
-            return const _ProfileMessage(message: 'Profile is unavailable.');
+            return const _ProfileMessage(message: 'Không thể tải hồ sơ.');
           }
           final currentUserId = context.read<AuthCubit>().state.user?.id;
           final isMe = currentUserId == profile.id;
@@ -340,7 +341,16 @@ class ProfileTopBar extends StatelessWidget {
           const SizedBox(width: 10),
           _TopBarIconButton(icon: Icons.camera_alt_outlined, onTap: () {}),
           const SizedBox(width: 10),
-          _TopBarIconButton(icon: Icons.menu_rounded, onTap: () {}),
+          _TopBarIconButton(
+            icon: Icons.menu_rounded,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const SettingsScreen(),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -612,8 +622,8 @@ class ProfileFollowersPreview extends StatelessWidget {
             }),
           ),
         ),
-        Text('${profile.followersCount} followers', style: textStyle),
-        Text('${profile.followingCount} following', style: textStyle),
+        Text('${profile.followersCount} người theo dõi', style: textStyle),
+        Text('${profile.followingCount} đang theo dõi', style: textStyle),
       ],
     );
   }
@@ -718,7 +728,7 @@ class FollowButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _ProfileActionButton(
-      label: isFollowing ? 'Đang theo dõi' : 'Follow',
+      label: isFollowing ? 'Đang theo dõi' : 'Theo dõi',
       onTap: isLoading ? null : onTap,
       isLoading: isLoading,
       isPrimary: !isFollowing,
@@ -1099,7 +1109,7 @@ class ProfileTabsSection extends StatelessWidget {
   final TabController controller;
 
   static const _tabs = [
-    'Thread',
+    'Chủ đề',
     'Câu trả lời',
     'File phương tiện',
     'Bài đăng lại',

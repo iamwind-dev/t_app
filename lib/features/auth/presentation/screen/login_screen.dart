@@ -68,7 +68,7 @@ class _LoginContent extends StatelessWidget {
           left: 0,
           right: 0,
           child: Text(
-            'English (US)',
+            'Tiếng Việt',
             textAlign: TextAlign.center,
             style: LoginTokens.language(context),
           ),
@@ -144,7 +144,7 @@ class _LoginFormState extends State<_LoginForm> {
             _LoginTextField(
               key: AuthWidgetKeys.usernameField,
               controller: _identifierController,
-              hintText: 'Username, email or mobile number',
+              hintText: 'Tên người dùng, email hoặc số điện thoại',
               textInputAction: TextInputAction.next,
               keyboardType: TextInputType.emailAddress,
               enabled: !isLoading,
@@ -153,7 +153,7 @@ class _LoginFormState extends State<_LoginForm> {
             _LoginTextField(
               key: AuthWidgetKeys.passwordField,
               controller: _passwordController,
-              hintText: 'Password',
+              hintText: 'Mật khẩu',
               obscureText: true,
               textInputAction: TextInputAction.done,
               enabled: !isLoading,
@@ -265,7 +265,7 @@ class _LoginButton extends StatelessWidget {
                   color: LoginTokens.buttonForeground(context),
                 ),
               )
-            : Text('Log in', style: LoginTokens.button(context)),
+            : Text('Đăng nhập', style: LoginTokens.button(context)),
       ),
     );
   }

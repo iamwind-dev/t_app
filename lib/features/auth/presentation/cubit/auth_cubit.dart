@@ -1,4 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:t_app/core/config/app_config.dart';
+import 'package:t_app/core/demo/demo_data.dart';
 import 'package:t_app/core/network/api_exception.dart';
 import 'package:t_app/features/auth/data/auth_user.dart';
 import 'package:t_app/features/auth/domain/auth_session_repository.dart';
@@ -14,6 +16,11 @@ class AuthCubit extends Cubit<AuthState> {
   final AuthSessionRepository _repository;
 
   Future<void> checkSession() async {
+    if (AppConfig.uiPreviewMode) {
+      emit(const AuthState(status: AuthStatus.unauthenticated));
+      return;
+    }
+
     emit(const AuthState(status: AuthStatus.checking));
 
     try {
@@ -33,6 +40,16 @@ class AuthCubit extends Cubit<AuthState> {
     required String identifier,
     required String password,
   }) async {
+    if (AppConfig.uiPreviewMode) {
+      emit(
+        const AuthState(
+          status: AuthStatus.authenticated,
+          user: DemoData.currentUser,
+        ),
+      );
+      return;
+    }
+
     emit(const AuthState(status: AuthStatus.loading));
 
     try {
@@ -47,7 +64,7 @@ class AuthCubit extends Cubit<AuthState> {
       emit(
         const AuthState(
           status: AuthStatus.failure,
-          errorMessage: 'Unable to log in. Please try again.',
+          errorMessage: 'Không thể đăng nhập. Vui lòng thử lại.',
         ),
       );
     }

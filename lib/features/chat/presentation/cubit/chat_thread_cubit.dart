@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:t_app/core/config/app_config.dart';
+import 'package:t_app/core/demo/demo_data.dart';
 import 'package:t_app/core/network/api_exception.dart';
 import 'package:t_app/features/chat/data/chat_conversation.dart';
 import 'package:t_app/features/chat/data/chat_message.dart';
@@ -33,6 +35,17 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
   ChatSocketService? get socketService => _socketService;
 
   Future<void> loadMessages() async {
+    if (AppConfig.uiPreviewMode) {
+      emit(
+        state.copyWith(
+          status: ChatThreadStatus.loaded,
+          messages: DemoData.messages(state.conversation.id),
+          clearError: true,
+        ),
+      );
+      return;
+    }
+
     emit(state.copyWith(status: ChatThreadStatus.loading, clearError: true));
 
     try {
@@ -60,7 +73,7 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
       emit(
         state.copyWith(
           status: ChatThreadStatus.failure,
-          errorMessage: 'Unable to load messages.',
+          errorMessage: 'Không thể tải tin nhắn.',
         ),
       );
     }
@@ -69,6 +82,32 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
   Future<void> sendMessage(String rawText) async {
     final text = rawText.trim();
     if (text.isEmpty) {
+      return;
+    }
+
+    if (AppConfig.uiPreviewMode) {
+      final message = ChatMessage(
+        id: 'preview_message_${DateTime.now().microsecondsSinceEpoch}',
+        conversationId: state.conversation.id,
+        sender: ChatUser(
+          id: state.currentUserId,
+          username: 'toi',
+          displayName: 'Tôi',
+        ),
+        type: 'text',
+        content: text,
+        text: text,
+        createdAt: DateTime.now().toUtc(),
+        updatedAt: DateTime.now().toUtc(),
+        status: MessageDeliveryStatus.sent,
+      );
+      emit(
+        state.copyWith(
+          status: ChatThreadStatus.loaded,
+          messages: [message, ...state.messages],
+          clearError: true,
+        ),
+      );
       return;
     }
 
@@ -81,8 +120,8 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
         conversationId: state.conversation.id,
         sender: ChatUser(
           id: state.currentUserId,
-          username: 'me',
-          displayName: 'Me',
+          username: 'toi',
+          displayName: 'Tôi',
         ),
         type: 'text',
         content: text,
@@ -130,11 +169,15 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
     } on ApiException catch (error) {
       emit(state.copyWith(errorMessage: error.message));
     } catch (_) {
-      emit(state.copyWith(errorMessage: 'Unable to send message.'));
+      emit(state.copyWith(errorMessage: 'Không thể gửi tin nhắn.'));
     }
   }
 
   Future<void> joinRealtime() async {
+    if (AppConfig.uiPreviewMode) {
+      return;
+    }
+
     final socketService = _socketService;
     if (socketService == null) {
       return;
@@ -147,6 +190,10 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
   }
 
   Future<void> leaveRealtime() async {
+    if (AppConfig.uiPreviewMode) {
+      return;
+    }
+
     final socketService = _socketService;
     if (socketService == null) {
       return;
@@ -173,10 +220,18 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
   }
 
   Future<void> typingStart() async {
+    if (AppConfig.uiPreviewMode) {
+      return;
+    }
+
     await _socketService?.typingStart(state.conversation.id);
   }
 
   Future<void> typingStop() async {
+    if (AppConfig.uiPreviewMode) {
+      return;
+    }
+
     await _socketService?.typingStop(state.conversation.id);
   }
 

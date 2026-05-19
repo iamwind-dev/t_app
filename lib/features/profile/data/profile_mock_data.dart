@@ -6,11 +6,11 @@ const profileUser = User(
   name: 'Thaii Duong',
   username: '__win.d',
   avatarAssetPath: 'assets/images/home_avatar_payal.png',
-  subtitle: 'Threads profile',
+  subtitle: 'Trang cá nhân Threads',
 );
 
 const profileBio = '🐺';
-const profileInterestTags = ['leomessi', 'FCBarcelona', 'Football', '+4'];
+const profileInterestTags = ['leomessi', 'FCBarcelona', 'Bóng đá', '+4'];
 const profileFollowersCount = 224;
 
 const profileFollowerPreviewAssets = [

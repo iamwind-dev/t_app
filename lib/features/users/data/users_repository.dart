@@ -84,7 +84,7 @@ class UsersRepository implements UsersProfileRepository {
       return user;
     }
 
-    throw const FormatException('User response is missing user.');
+    throw const FormatException('Phản hồi người dùng thiếu trường user.');
   }
 
   static Map<String, dynamic> _asMap(Object? value) {
@@ -92,6 +92,6 @@ class UsersRepository implements UsersProfileRepository {
       return value;
     }
 
-    throw const FormatException('Expected a JSON object.');
+    throw const FormatException('Cần một đối tượng JSON.');
   }
 }

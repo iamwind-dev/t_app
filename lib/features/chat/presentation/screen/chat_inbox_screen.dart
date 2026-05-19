@@ -69,10 +69,10 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                 const Center(child: CircularProgressIndicator())
               else if (state.status == ChatInboxStatus.failure)
                 _InboxMessage(
-                  message: state.errorMessage ?? 'Unable to load chats.',
+                  message: state.errorMessage ?? 'Không thể tải tin nhắn.',
                 )
               else if (state.conversations.isEmpty)
-                const _InboxMessage(message: 'Chua co cuoc tro chuyen nao.')
+                const _InboxMessage(message: 'Chưa có cuộc trò chuyện nào.')
               else
                 ...state.conversations.map(
                   (conversation) => _InboxPreviewTile(
@@ -102,7 +102,7 @@ class _InboxHeader extends StatelessWidget {
         child: Row(
           children: [
             Expanded(
-              child: Text('Tin nhan', style: ChatInboxTokens.title(context)),
+              child: Text('Tin nhắn', style: ChatInboxTokens.title(context)),
             ),
             SizedBox.square(
               dimension: 48,
@@ -173,7 +173,7 @@ class _InboxSearchField extends StatelessWidget {
                   color: ChatInboxTokens.mutedIcon(context),
                 ),
                 const SizedBox(width: ChatInboxTokens.searchIconGap),
-                Text('Tim kiem', style: ChatInboxTokens.searchHint(context)),
+                Text('Tìm kiếm', style: ChatInboxTokens.searchHint(context)),
               ],
             ),
           ),
@@ -197,9 +197,9 @@ class _InboxFilters extends StatelessWidget {
         children: [
           _FilterIconChip(),
           SizedBox(width: ChatInboxTokens.filterGap),
-          _FilterTextChip(label: 'Hop thu', width: 106, isSelected: true),
+          _FilterTextChip(label: 'Hộp thư', width: 106, isSelected: true),
           SizedBox(width: ChatInboxTokens.filterGap),
-          _FilterTextChip(label: 'Tin nhan dang cho', width: 158),
+          _FilterTextChip(label: 'Tin nhắn đang chờ', width: 158),
         ],
       ),
     );
@@ -280,8 +280,8 @@ class _InboxPreviewTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final currentUserId = context.read<AuthCubit>().state.user?.id ?? '';
     final user = conversation.otherMember(currentUserId)?.user;
-    final title = user?.username ?? 'Unknown';
-    final subtitle = conversation.lastMessage?.text ?? 'Chua co tin nhan';
+    final title = user?.username ?? 'Không xác định';
+    final subtitle = conversation.lastMessage?.text ?? 'Chưa có tin nhắn';
 
     return GestureDetector(
       key: ChatWidgetKeys.inboxConversationPreview,
@@ -322,7 +322,7 @@ class _InboxPreviewTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      '$subtitle - ${conversation.unreadCount} moi',
+                      '$subtitle - ${conversation.unreadCount} mới',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: ChatInboxTokens.metadata(context),

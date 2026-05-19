@@ -318,7 +318,7 @@ class ThreadComposerHeader extends StatelessWidget {
             onTap: onCancel,
             behavior: HitTestBehavior.opaque,
             child: Text(
-              'Huy',
+              'Hủy',
               style: textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w500,
                 color: colorScheme.onSurface,
@@ -328,7 +328,7 @@ class ThreadComposerHeader extends StatelessWidget {
           Expanded(
             child: Center(
               child: Text(
-                mode == ComposerMode.reply ? 'Tra loi' : 'Thread moi',
+                mode == ComposerMode.reply ? 'Trả lời' : 'Chủ đề mới',
                 style: textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: colorScheme.onSurface,
@@ -590,8 +590,8 @@ class ThreadDraftItemComposer extends StatelessWidget {
                           decoration: InputDecoration(
                             isDense: true,
                             hintText: mode == ComposerMode.reply
-                                ? 'Tra loi...'
-                                : 'Co gi moi?',
+                                ? 'Trả lời...'
+                                : 'Có gì mới?',
                             hintStyle: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(color: colorScheme.onSurfaceVariant),
                             border: InputBorder.none,
@@ -676,7 +676,7 @@ class AddToThreadRow extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Text(
-            'Them vao thread',
+            'Thêm vào chủ đề',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w500,
@@ -730,7 +730,7 @@ class ThreadComposerFooter extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            mode == ComposerMode.reply ? 'Dang tra loi' : 'Lua chon tra loi',
+            mode == ComposerMode.reply ? 'Đang trả lời' : 'Lựa chọn trả lời',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -819,8 +819,8 @@ class ThreadComposerFooter extends StatelessWidget {
                   ],
                   Text(
                     isSuccess
-                        ? 'Thanh cong'
-                        : (mode == ComposerMode.reply ? 'Tra loi' : 'Dang'),
+                        ? 'Thành công'
+                        : (mode == ComposerMode.reply ? 'Trả lời' : 'Đăng'),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: isSuccess ? Colors.green : colorScheme.onSurface,

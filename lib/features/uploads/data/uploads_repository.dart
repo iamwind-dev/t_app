@@ -37,7 +37,7 @@ class UploadsRepository implements UploadsImageRepository {
       return UploadImageResult.fromJson(upload);
     }
 
-    throw const FormatException('Upload response is missing upload.');
+    throw const FormatException('Phản hồi tải lên thiếu trường upload.');
   }
 
   static Map<String, dynamic> _asMap(Object? value) {
@@ -45,6 +45,6 @@ class UploadsRepository implements UploadsImageRepository {
       return value;
     }
 
-    throw const FormatException('Expected a JSON object.');
+    throw const FormatException('Cần một đối tượng JSON.');
   }
 }

@@ -2,6 +2,11 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:t_app/features/reels/data/datasources/reels_local_data_source.dart';
+import 'package:t_app/features/reels/data/repositories_impl/reels_repository_impl.dart';
+import 'package:t_app/features/reels/domain/repositories/reels_repository.dart';
+import 'package:t_app/features/reels/domain/usecases/get_reels.dart';
+import 'package:t_app/features/reels/presentation/cubits/reels_cubit.dart';
 
 import 'core/config/app_config.dart';
 import 'core/network/api_client.dart';
@@ -56,6 +61,10 @@ Future<void> main() async {
     apiClient: apiClient,
     realtimeClient: chatSocketService,
   );
+  final reelsLocalDataSource = ReelsLocalDataSourceImpl();
+  final reelsRepository = ReelsRepositoryImpl(
+    localDataSource: reelsLocalDataSource,
+  );
 
   runApp(
     TogetherApp(
@@ -69,6 +78,7 @@ Future<void> main() async {
       notificationsRepository: notificationsRepository,
       chatRepository: chatRepository,
       chatSocketService: chatSocketService,
+      reelsRepository: reelsRepository,
     ),
   );
 }
@@ -86,6 +96,7 @@ class TogetherApp extends StatelessWidget {
     required this.notificationsRepository,
     required this.chatRepository,
     required this.chatSocketService,
+    required this.reelsRepository,
   });
 
   final ThemeModeStorage themeModeStorage;
@@ -98,6 +109,7 @@ class TogetherApp extends StatelessWidget {
   final NotificationsActivityRepository notificationsRepository;
   final ChatRepository chatRepository;
   final ChatSocketService chatSocketService;
+  final ReelsRepository reelsRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -117,6 +129,7 @@ class TogetherApp extends StatelessWidget {
         ),
         RepositoryProvider<ChatRepository>.value(value: chatRepository),
         RepositoryProvider<ChatSocketService>.value(value: chatSocketService),
+        RepositoryProvider<ReelsRepository>.value(value: reelsRepository),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -133,6 +146,10 @@ class TogetherApp extends StatelessWidget {
           BlocProvider(
             create: (_) =>
                 HomeCubit(repository: postsRepository)..loadHomeFeed(),
+          ),
+          BlocProvider(
+            create: (_) =>
+                ReelsCubit(getReels: GetReels(reelsRepository))..loadReels(),
           ),
         ],
         child: BlocBuilder<ThemeModeCubit, ThemeMode>(

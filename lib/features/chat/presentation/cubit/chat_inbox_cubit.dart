@@ -1,4 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:t_app/core/config/app_config.dart';
+import 'package:t_app/core/demo/demo_data.dart';
 import 'package:t_app/core/network/api_exception.dart';
 import 'package:t_app/features/chat/domain/chat_repository.dart';
 
@@ -12,6 +14,16 @@ class ChatInboxCubit extends Cubit<ChatInboxState> {
   final ChatRepository _repository;
 
   Future<void> loadConversations() async {
+    if (AppConfig.uiPreviewMode) {
+      emit(
+        ChatInboxState(
+          status: ChatInboxStatus.loaded,
+          conversations: DemoData.conversations(),
+        ),
+      );
+      return;
+    }
+
     emit(state.copyWith(status: ChatInboxStatus.loading, clearError: true));
 
     try {
@@ -33,7 +45,7 @@ class ChatInboxCubit extends Cubit<ChatInboxState> {
       emit(
         state.copyWith(
           status: ChatInboxStatus.failure,
-          errorMessage: 'Unable to load chats.',
+          errorMessage: 'Không thể tải tin nhắn.',
         ),
       );
     }

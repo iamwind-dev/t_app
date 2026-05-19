@@ -127,7 +127,7 @@ class _ConversationHeader extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    user?.username ?? 'Unknown',
+                    user?.username ?? 'Không xác định',
                     style: ChatThreadTokens.headerUsername(context),
                   ),
                   Text(
@@ -222,7 +222,7 @@ class _ConversationBody extends StatelessWidget {
     if (state.status == ChatThreadStatus.failure && state.messages.isEmpty) {
       return Center(
         child: Text(
-          state.errorMessage ?? 'Unable to load messages.',
+          state.errorMessage ?? 'Không thể tải tin nhắn.',
           style: ChatThreadTokens.profileMeta(context),
         ),
       );
@@ -231,7 +231,7 @@ class _ConversationBody extends StatelessWidget {
     if (state.messages.isEmpty) {
       return Center(
         child: Text(
-          'Chua co tin nhan nao.',
+          'Chưa có tin nhắn nào.',
           style: ChatThreadTokens.profileMeta(context),
         ),
       );
@@ -344,10 +344,10 @@ class _OutgoingMessage extends StatelessWidget {
 
   String _statusText(MessageDeliveryStatus status) {
     return switch (status) {
-      MessageDeliveryStatus.sending => 'Dang gui...',
-      MessageDeliveryStatus.sent => 'Da gui',
-      MessageDeliveryStatus.seen => 'Da xem',
-      MessageDeliveryStatus.failed => 'Gui loi',
+      MessageDeliveryStatus.sending => 'Đang gửi...',
+      MessageDeliveryStatus.sent => 'Đã gửi',
+      MessageDeliveryStatus.seen => 'Đã xem',
+      MessageDeliveryStatus.failed => 'Gửi lỗi',
     };
   }
 }
@@ -369,7 +369,7 @@ class _TypingIndicator extends StatelessWidget {
       child: Align(
         alignment: Alignment.centerLeft,
         child: Text(
-          '$username dang nhap...',
+          '$username đang nhập...',
           style: ChatThreadTokens.profileMeta(context),
         ),
       ),
@@ -519,7 +519,7 @@ class _MessageComposerState extends State<_MessageComposer> {
                       onChanged: _handleTextChanged,
                       onSubmitted: (_) => _send(),
                       decoration: InputDecoration(
-                        hintText: 'Nhan tin...',
+                        hintText: 'Nhắn tin...',
                         hintStyle: ChatThreadTokens.composerPlaceholder(
                           context,
                         ),

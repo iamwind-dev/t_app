@@ -103,7 +103,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
               if (state.status == ActivityStatus.failure) {
                 return _ActivityMessage(
-                  message: state.errorMessage ?? 'Unable to load activity.',
+                  message: state.errorMessage ?? 'Không thể tải hoạt động.',
                 );
               }
 

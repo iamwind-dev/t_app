@@ -1,5 +1,8 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:t_app/core/config/app_config.dart';
+import 'package:t_app/core/demo/demo_data.dart';
 import 'package:t_app/core/network/api_exception.dart';
+import 'package:t_app/features/profile/data/profile_mock_data.dart';
 import 'package:t_app/features/users/domain/users_profile_repository.dart';
 
 import 'profile_state.dart';
@@ -12,6 +15,17 @@ class ProfileCubit extends Cubit<ProfileState> {
   final UsersProfileRepository _repository;
 
   Future<void> loadProfile(String userId) async {
+    if (AppConfig.uiPreviewMode) {
+      emit(
+        const ProfileState(
+          status: ProfileStatus.loaded,
+          profile: DemoData.currentProfile,
+          threads: profileThreads,
+        ),
+      );
+      return;
+    }
+
     emit(const ProfileState(status: ProfileStatus.loading));
 
     try {
@@ -36,7 +50,7 @@ class ProfileCubit extends Cubit<ProfileState> {
       emit(
         const ProfileState(
           status: ProfileStatus.failure,
-          errorMessage: 'Unable to load profile.',
+          errorMessage: 'Không thể tải hồ sơ.',
         ),
       );
     }
@@ -55,7 +69,7 @@ class ProfileCubit extends Cubit<ProfileState> {
     } on ApiException catch (error) {
       emit(state.copyWith(errorMessage: error.message));
     } catch (_) {
-      emit(state.copyWith(errorMessage: 'Unable to load profile posts.'));
+      emit(state.copyWith(errorMessage: 'Không thể tải bài viết hồ sơ.'));
     }
   }
 
@@ -64,6 +78,23 @@ class ProfileCubit extends Cubit<ProfileState> {
     String? bio,
     String? avatarUrl,
   }) async {
+    if (AppConfig.uiPreviewMode) {
+      final current = state.profile ?? DemoData.currentProfile;
+      emit(
+        state.copyWith(
+          status: ProfileStatus.loaded,
+          profile: current.copyWith(
+            displayName: displayName,
+            bio: bio,
+            avatarUrl: avatarUrl,
+          ),
+          isSaving: false,
+          clearError: true,
+        ),
+      );
+      return;
+    }
+
     emit(state.copyWith(isSaving: true, clearError: true));
 
     try {
@@ -87,13 +118,26 @@ class ProfileCubit extends Cubit<ProfileState> {
       emit(
         state.copyWith(
           isSaving: false,
-          errorMessage: 'Unable to update profile.',
+          errorMessage: 'Không thể cập nhật hồ sơ.',
         ),
       );
     }
   }
 
   Future<void> followUser(String userId) async {
+    if (AppConfig.uiPreviewMode) {
+      final current = state.profile ?? DemoData.searchProfile;
+      emit(
+        state.copyWith(
+          status: ProfileStatus.loaded,
+          profile: current.copyWith(isFollowing: true),
+          isFollowUpdating: false,
+          clearError: true,
+        ),
+      );
+      return;
+    }
+
     emit(state.copyWith(isFollowUpdating: true, clearError: true));
 
     try {
@@ -114,13 +158,26 @@ class ProfileCubit extends Cubit<ProfileState> {
       emit(
         state.copyWith(
           isFollowUpdating: false,
-          errorMessage: 'Unable to follow user.',
+          errorMessage: 'Không thể theo dõi người dùng.',
         ),
       );
     }
   }
 
   Future<void> unfollowUser(String userId) async {
+    if (AppConfig.uiPreviewMode) {
+      final current = state.profile ?? DemoData.searchProfile;
+      emit(
+        state.copyWith(
+          status: ProfileStatus.loaded,
+          profile: current.copyWith(isFollowing: false),
+          isFollowUpdating: false,
+          clearError: true,
+        ),
+      );
+      return;
+    }
+
     emit(state.copyWith(isFollowUpdating: true, clearError: true));
 
     try {
@@ -141,7 +198,7 @@ class ProfileCubit extends Cubit<ProfileState> {
       emit(
         state.copyWith(
           isFollowUpdating: false,
-          errorMessage: 'Unable to unfollow user.',
+          errorMessage: 'Không thể bỏ theo dõi người dùng.',
         ),
       );
     }

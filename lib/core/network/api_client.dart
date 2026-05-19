@@ -90,7 +90,7 @@ class ApiClient {
 
       throw ApiException(
         code: envelope.errorCode,
-        message: envelope.errorMessage ?? 'Request failed.',
+        message: envelope.errorMessage ?? 'Yêu cầu thất bại.',
         statusCode: response.statusCode,
       );
     } on DioException catch (error) {
@@ -98,13 +98,13 @@ class ApiClient {
     } on ApiException {
       rethrow;
     } catch (error) {
-      throw ApiException(message: 'Unable to parse API response: $error');
+      throw ApiException(message: 'Không thể đọc phản hồi API: $error');
     }
   }
 
   _ApiEnvelope _readEnvelope(Object? data) {
     if (data is! Map<String, dynamic>) {
-      throw const ApiException(message: 'Invalid API response shape.');
+      throw const ApiException(message: 'Định dạng phản hồi API không hợp lệ.');
     }
 
     return _ApiEnvelope.fromJson(data);
@@ -117,13 +117,13 @@ class ApiClient {
       final envelope = _ApiEnvelope.fromJson(data);
       return ApiException(
         code: envelope.errorCode,
-        message: envelope.errorMessage ?? error.message ?? 'Request failed.',
+        message: envelope.errorMessage ?? error.message ?? 'Yêu cầu thất bại.',
         statusCode: response?.statusCode,
       );
     }
 
     return ApiException(
-      message: error.message ?? 'Network request failed.',
+      message: error.message ?? 'Yêu cầu mạng thất bại.',
       statusCode: response?.statusCode,
     );
   }
