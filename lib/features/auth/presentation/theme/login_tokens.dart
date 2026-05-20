@@ -36,19 +36,25 @@ final class LoginTokens {
   );
 
   static Color pageBackground(BuildContext context) {
-    return const Color(0xFF0D0D0D);
+    return Theme.of(context).colorScheme.surface;
   }
 
   static Color fieldBackground(BuildContext context) {
-    return const Color(0xFF0D0D0D);
+    final colorScheme = Theme.of(context).colorScheme;
+    return colorScheme.brightness == Brightness.dark
+        ? const Color(0xFF0D0D0D)
+        : colorScheme.surface;
   }
 
   static Color fieldBorder(BuildContext context) {
-    return const Color(0xFF312E2E);
+    final colorScheme = Theme.of(context).colorScheme;
+    return colorScheme.brightness == Brightness.dark
+        ? const Color(0xFF312E2E)
+        : colorScheme.outline;
   }
 
   static Color mutedText(BuildContext context) {
-    return const Color(0xFF878787);
+    return Theme.of(context).colorScheme.onSurfaceVariant;
   }
 
   static Color buttonBackground(BuildContext context) {

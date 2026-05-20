@@ -1,4 +1,4 @@
-import 'dart:math' as math;
+﻿import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,8 +7,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:t_app/core/keys/auth/auth_widget_keys.dart';
 import 'package:t_app/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:t_app/features/auth/presentation/cubit/auth_state.dart';
-import 'package:t_app/features/auth/presentation/screen/register_screen.dart';
 import 'package:t_app/features/auth/presentation/theme/login_tokens.dart';
+import 'package:t_app/features/register/presentation/screen/register_screen.dart';
 import 'package:t_app/generated/assets.gen.dart';
 
 class LoginScreen extends StatelessWidget {
@@ -17,12 +17,16 @@ class LoginScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pageBackground = LoginTokens.pageBackground(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final systemBrightness = isDark ? Brightness.light : Brightness.dark;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(
+      value: (isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
+          .copyWith(
         statusBarColor: pageBackground,
         systemNavigationBarColor: pageBackground,
-        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarIconBrightness: systemBrightness,
+        statusBarIconBrightness: systemBrightness,
       ),
       child: Scaffold(
         backgroundColor: pageBackground,
@@ -78,7 +82,7 @@ class _LoginContent extends StatelessWidget {
           top: _scaledTop(LoginTokens.logoTop, safeTop),
           left: 0,
           right: 0,
-          child: const Center(child: _InstagramLogo()),
+          child: const Center(child: _AppLogo()),
         ),
         Positioned(
           top: _scaledTop(LoginTokens.formTop, safeTop),
@@ -182,12 +186,18 @@ class _LoginFormState extends State<_LoginForm> {
                   ? null
                   : () {
                       Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const RegisterScreen(),
+                        MaterialPageRoute(
+                          builder: (_) => RegisterScreen.withDependencies(),
                         ),
                       );
                     },
-              child: const Text('Tạo tài khoản mới'),
+              child: Text(
+                'Đăng ký',
+                style: LoginTokens.input(context).copyWith(
+                  color: LoginTokens.buttonBackground(context),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
         );
@@ -285,12 +295,12 @@ class _LoginButton extends StatelessWidget {
   }
 }
 
-class _InstagramLogo extends StatelessWidget {
-  const _InstagramLogo();
+class _AppLogo extends StatelessWidget {
+  const _AppLogo();
 
   @override
   Widget build(BuildContext context) {
-    return Assets.images.login.loginInstagramLogo.svg(
+    return Assets.icons.logo.svg(
       width: LoginTokens.instagramLogoSize,
       height: LoginTokens.instagramLogoSize,
     );

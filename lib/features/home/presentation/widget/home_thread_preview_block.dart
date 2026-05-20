@@ -64,6 +64,7 @@ class _HomeThreadPreviewBlockState extends State<HomeThreadPreviewBlock> {
         onReplyTap: widget.onReplyTap,
         onLikeTap: () => widget.onLikeTap(widget.rootThread),
         showReplyHint: false,
+        enableContentBlurDemo: true,
       );
     }
 
@@ -104,6 +105,7 @@ class _HomeThreadPreviewBlockState extends State<HomeThreadPreviewBlock> {
                 onLikeTap: () => widget.onLikeTap(thread),
                 showTimelineConnectors: false,
                 showReplyHint: false,
+                enableContentBlurDemo: true,
               ),
             );
           }),

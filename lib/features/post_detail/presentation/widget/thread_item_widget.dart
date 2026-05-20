@@ -4,6 +4,7 @@ import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 import 'package:t_app/features/users/presentation/widgets/user_avatar_button.dart';
 import 'package:t_app/features/users/presentation/widgets/user_name_button.dart';
 
+import 'blurred_paragraph.dart';
 import 'thread_media_section.dart';
 
 class ThreadItemWidget extends StatelessWidget {
@@ -22,6 +23,7 @@ class ThreadItemWidget extends StatelessWidget {
     this.showReplyHint = true,
     this.isRepliesExpanded = false,
     this.highlighted = false,
+    this.enableContentBlurDemo = false,
   });
 
   final ThreadItemModel thread;
@@ -37,6 +39,7 @@ class ThreadItemWidget extends StatelessWidget {
   final bool showReplyHint;
   final bool isRepliesExpanded;
   final bool highlighted;
+  final bool enableContentBlurDemo;
 
   static const double timelineWidth = 56;
   static const double avatarRadius = 18;
@@ -75,7 +78,10 @@ class ThreadItemWidget extends StatelessWidget {
                 children: [
                   ThreadHeader(thread: thread),
                   const SizedBox(height: 6),
-                  ThreadContentSection(thread: thread),
+                  ThreadContentSection(
+                    thread: thread,
+                    enableContentBlurDemo: enableContentBlurDemo,
+                  ),
                   if (thread.imageUrls.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     ThreadMediaSection(imageUrls: thread.imageUrls),
@@ -159,15 +165,55 @@ class ThreadHeader extends StatelessWidget {
 }
 
 class ThreadContentSection extends StatelessWidget {
-  const ThreadContentSection({super.key, required this.thread});
+  const ThreadContentSection({
+    super.key,
+    required this.thread,
+    this.enableContentBlurDemo = false,
+  });
 
   final ThreadItemModel thread;
+  final bool enableContentBlurDemo;
+
+  static const Map<String, Set<int>> _blurredParagraphIndexesByThreadId = {
+    'thread_101': {0},
+    'thread_102': {0},
+  };
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      thread.content,
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.5),
+    final textStyle = Theme.of(
+      context,
+    ).textTheme.bodyMedium?.copyWith(height: 1.5);
+    final blurIndexes = enableContentBlurDemo
+        ? (_blurredParagraphIndexesByThreadId[thread.id] ?? const <int>{})
+        : const <int>{};
+    if (blurIndexes.isEmpty) {
+      return Text(thread.content, style: textStyle);
+    }
+
+    final paragraphs = thread.content.split('\n\n');
+    if (paragraphs.length == 1 && blurIndexes.contains(0)) {
+      return BlurredParagraph(
+        text: thread.content,
+        textStyle: textStyle ?? const TextStyle(height: 1.5),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: List.generate(paragraphs.length, (index) {
+        final paragraph = paragraphs[index];
+        final isBlurred = blurIndexes.contains(index);
+        return Padding(
+          padding: EdgeInsets.only(bottom: index == paragraphs.length - 1 ? 0 : 12),
+          child: isBlurred
+              ? BlurredParagraph(
+                  text: paragraph,
+                  textStyle: textStyle ?? const TextStyle(height: 1.5),
+                )
+              : Text(paragraph, style: textStyle),
+        );
+      }),
     );
   }
 }
