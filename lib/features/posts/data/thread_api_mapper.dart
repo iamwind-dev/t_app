@@ -1,5 +1,6 @@
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 import 'package:t_app/features/post_detail/data/models/user.dart';
+import 'package:t_app/core/network/backend_url_normalizer.dart';
 
 class ThreadApiMapper {
   const ThreadApiMapper._();
@@ -47,7 +48,9 @@ class ThreadApiMapper {
       id: json['id'] as String? ?? '',
       name: json['displayName'] as String? ?? username,
       username: username,
-      avatarUrl: json['avatarUrl'] as String?,
+      avatarUrl: BackendUrlNormalizer.normalizeNullable(
+        json['avatarUrl'] as String?,
+      ),
     );
   }
 
@@ -56,7 +59,10 @@ class ThreadApiMapper {
       return const [];
     }
 
-    return value.whereType<String>().toList(growable: false);
+    return value
+        .whereType<String>()
+        .map(BackendUrlNormalizer.normalize)
+        .toList(growable: false);
   }
 
   static String _formatCreatedAt(String? value) {

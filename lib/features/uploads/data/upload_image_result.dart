@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:t_app/core/network/backend_url_normalizer.dart';
 
 enum UploadImageType {
   post('post'),
@@ -39,7 +40,7 @@ class UploadImageResult extends Equatable {
     }
 
     return UploadImageResult(
-      secureUrl: secureUrl,
+      secureUrl: BackendUrlNormalizer.normalize(secureUrl),
       publicId: publicId,
       type: UploadImageType.fromValue(typeValue),
     );

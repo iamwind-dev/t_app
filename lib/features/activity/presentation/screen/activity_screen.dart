@@ -109,7 +109,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Khong the mo noi dung nay.')),
+        const SnackBar(content: Text('Không thể mở nội dung này.')),
       );
     }
   }
@@ -159,15 +159,15 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
               if (state.status == ActivityStatus.failure) {
                 return _ActivityMessage(
-                  message:
+                    message:
                       state.errorMessage ??
-                      'KhÃ´ng thá»ƒ táº£i hoáº¡t Ä‘á»™ng.',
+                      'Không thể tải hoạt động.',
                 );
               }
 
               if (items.isEmpty) {
                 return const _ActivityMessage(
-                  message: 'ChÆ°a cÃ³ hoáº¡t Ä‘á»™ng nÃ o.',
+                  message: 'Chưa có hoạt động nào.',
                 );
               }
 
@@ -242,7 +242,7 @@ class ActivityHeader extends StatelessWidget {
           Row(
             children: [
               Text(
-                'Hoáº¡t Ä‘á»™ng',
+                'Hoạt động',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.8,
@@ -278,7 +278,7 @@ class ActivityHeader extends StatelessWidget {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Da doc het'),
+                      : const Text('Đã đọc hết'),
                 ),
             ],
           ),
@@ -304,9 +304,9 @@ class ActivityFilterChips extends StatelessWidget {
   final ValueChanged<ActivityFilter> onChanged;
 
   static const _entries = [
-    (ActivityFilter.all, 'Táº¥t cáº£'),
-    (ActivityFilter.follows, 'LÆ°á»£t theo dÃµi'),
-    (ActivityFilter.conversations, 'Cuá»™c trÃ² chuyá»‡n'),
+    (ActivityFilter.all, 'Tất cả'),
+    (ActivityFilter.follows, 'Lượt theo dõi'),
+    (ActivityFilter.conversations, 'Cuộc trò chuyện'),
   ];
 
   @override
@@ -620,7 +620,7 @@ class _FollowButton extends StatelessWidget {
           ),
         ),
         child: Text(
-          isFollowed ? 'Äang theo dÃµi' : 'Theo dÃµi',
+          isFollowed ? 'Đang theo dõi' : 'Theo dõi',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w700,
             color: isFollowed ? colorScheme.onSurface : Colors.black,

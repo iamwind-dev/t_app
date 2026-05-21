@@ -19,6 +19,26 @@ class User extends Equatable {
   final String? subtitle;
   final bool isVerified;
 
+  User copyWith({
+    String? id,
+    String? name,
+    String? username,
+    String? avatarAssetPath,
+    String? avatarUrl,
+    String? subtitle,
+    bool? isVerified,
+  }) {
+    return User(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      username: username ?? this.username,
+      avatarAssetPath: avatarAssetPath ?? this.avatarAssetPath,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      subtitle: subtitle ?? this.subtitle,
+      isVerified: isVerified ?? this.isVerified,
+    );
+  }
+
   @override
   List<Object?> get props => [
     id,

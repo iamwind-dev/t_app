@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:developer' as developer;
 
+import 'package:dio/dio.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:t_app/core/network/api_exception.dart';
 import 'package:t_app/core/network/api_token_store.dart';
+import 'package:t_app/core/realtime/realtime_event_bus.dart';
+import 'package:t_app/core/realtime/realtime_event_cursor_store.dart';
 
 import 'chat_message.dart';
 import 'chat_realtime_client.dart';
@@ -16,13 +20,16 @@ class SocketIoChatRealtimeClient
   SocketIoChatRealtimeClient({
     required String baseUrl,
     required ApiTokenStore tokenStore,
+    RealtimeEventCursorStore? eventCursorStore,
     SocketDebugLog? debugLog,
   }) : _baseUrl = baseUrl,
        _tokenStore = tokenStore,
+       _eventCursorStore = eventCursorStore ?? const RealtimeEventCursorStore(),
        _debugLog = debugLog ?? _defaultDebugLog;
 
   final String _baseUrl;
   final ApiTokenStore _tokenStore;
+  final RealtimeEventCursorStore _eventCursorStore;
   final SocketDebugLog _debugLog;
   final _connectionStatusController =
       StreamController<ChatConnectionStatus>.broadcast();
@@ -38,6 +45,12 @@ class SocketIoChatRealtimeClient
       StreamController<ChatMessageFailedEvent>.broadcast();
   final _messageSeenController =
       StreamController<ChatMessageSeenEvent>.broadcast();
+  final Set<String> _joinedConversationIds = <String>{};
+  final Set<String> _seenEventIds = <String>{};
+  final Queue<String> _seenEventQueue = Queue<String>();
+  final Map<String, String> _latestOrderingByKey = <String, String>{};
+  final Set<String> _joinedRooms = <String>{};
+  static const int _maxSeenEventIds = 500;
   io.Socket? _socket;
 
   @override
@@ -65,7 +78,11 @@ class SocketIoChatRealtimeClient
   Stream<ChatTypingEvent> get typingStopped => _typingStoppedController.stream;
 
   @override
-  Future<void> connect() async {
+  Future<void> connect() {
+    return _connect(allowRefresh: true);
+  }
+
+  Future<void> _connect({required bool allowRefresh}) async {
     final existing = _socket;
     if (existing?.connected == true) {
       return;
@@ -73,14 +90,14 @@ class SocketIoChatRealtimeClient
 
     final token = await _tokenStore.readToken();
     if (token == null || token.isEmpty) {
-      _debug('Socket.IO không thể kết nối: thiếu token đăng nhập.');
-      throw const ApiException(message: 'Cần đăng nhập để tiếp tục.');
+      _debug('Socket.IO cannot connect: missing auth token.');
+      throw const ApiException(message: 'Can not connect chat without login.');
     }
 
     _connectionStatusController.add(ChatConnectionStatus.connecting);
     final completer = Completer<void>();
     final socket = io.io(
-      _baseUrl,
+      _realtimeUrl(_baseUrl),
       io.OptionBuilder()
           .setTransports(['websocket'])
           .setAuth({'token': token})
@@ -104,20 +121,31 @@ class SocketIoChatRealtimeClient
         _debug('Socket.IO connect_error: $error');
         _connectionStatusController.add(ChatConnectionStatus.disconnected);
         if (!completer.isCompleted) {
-          completer.completeError(
-            ApiException(message: 'Không thể kết nối tin nhắn: $error'),
-          );
+          completer.completeError(error ?? 'unknown_error');
         }
       })
       ..connect();
 
-    return completer.future.timeout(
-      const Duration(seconds: 10),
-      onTimeout: () {
-        _debug('Socket.IO connect timed out after 10 seconds.');
-        throw const ApiException(message: 'Không thể kết nối tin nhắn.');
-      },
-    );
+    try {
+      await completer.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw 'connect_timeout',
+      );
+      await _joinDefaultRooms();
+      await _resubscribeRooms();
+      await _syncMissedEvents(rooms: _joinedRooms.toList(growable: false));
+    } catch (error) {
+      await disconnect();
+      if (allowRefresh && _isTokenExpiredError(error)) {
+        final refreshed = await _refreshAccessToken();
+        if (refreshed) {
+          return _connect(allowRefresh: false);
+        }
+      }
+
+      _debug('Socket.IO connect failed: $error');
+      throw ApiException(message: 'Can not connect chat: $error');
+    }
   }
 
   @override
@@ -132,6 +160,7 @@ class SocketIoChatRealtimeClient
   Future<void> joinConversation(String conversationId) async {
     await connect();
     await _emitWithAck('join_conversation', {'conversationId': conversationId});
+    _joinedConversationIds.add(conversationId);
   }
 
   @override
@@ -139,6 +168,35 @@ class SocketIoChatRealtimeClient
     await _emitWithAck('leave_conversation', {
       'conversationId': conversationId,
     });
+    _joinedConversationIds.remove(conversationId);
+  }
+
+  @override
+  Future<void> joinRoom(String room) async {
+    if (room.trim().isEmpty) {
+      return;
+    }
+    await connect();
+    await _emitWithAck('subscribe_rooms', {
+      'rooms': [room],
+    });
+    _joinedRooms.add(room);
+  }
+
+  @override
+  Future<void> leaveRoom(String room) async {
+    if (room.trim().isEmpty) {
+      return;
+    }
+    await _emitWithAck('unsubscribe_rooms', {
+      'rooms': [room],
+    });
+    _joinedRooms.remove(room);
+  }
+
+  @override
+  Future<void> syncEvents({List<String> rooms = const []}) async {
+    await _syncMissedEvents(rooms: rooms);
   }
 
   @override
@@ -176,7 +234,7 @@ class SocketIoChatRealtimeClient
     );
     final message = data['message'];
     if (message is! Map<String, dynamic>) {
-      throw const ApiException(message: 'Phản hồi tin nhắn thiếu nội dung.');
+      throw const ApiException(message: 'Chat response missing message payload.');
     }
 
     final returnedClientId =
@@ -228,8 +286,8 @@ class SocketIoChatRealtimeClient
   ) async {
     final socket = _socket;
     if (socket == null) {
-      _debug('Socket.IO emit blocked for $event: socket is unavailable.');
-      throw const ApiException(message: 'Kết nối tin nhắn không khả dụng.');
+      _debug('Socket.IO emit blocked for $event: socket unavailable.');
+      throw const ApiException(message: 'Chat connection is unavailable.');
     }
 
     final completer = Completer<Map<String, dynamic>>();
@@ -246,20 +304,26 @@ class SocketIoChatRealtimeClient
       },
     );
 
-    return completer.future.timeout(
-      const Duration(seconds: 10),
-      onTimeout: () {
-        _debug('Socket.IO $event timed out after 10 seconds.');
-        throw const ApiException(
-          message: 'Yêu cầu tin nhắn đã quá thời gian chờ.',
-        );
-      },
-    );
+    try {
+      return await completer.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          _debug('Socket.IO $event timed out after 10 seconds.');
+          throw const ApiException(message: 'Chat request timed out.');
+        },
+      );
+    } on ApiException catch (error) {
+      if (_isAuthExpiredApiError(error) && await _refreshAccessToken()) {
+        await _connect(allowRefresh: false);
+        return _emitWithAck(event, payload);
+      }
+      rethrow;
+    }
   }
 
   Map<String, dynamic> _readAckData(Object? response) {
     if (response is! Map) {
-      throw const ApiException(message: 'Phản hồi tin nhắn không hợp lệ.');
+      throw const ApiException(message: 'Invalid chat response format.');
     }
 
     final ack = Map<String, dynamic>.from(response);
@@ -276,11 +340,12 @@ class SocketIoChatRealtimeClient
       final errorMap = Map<String, dynamic>.from(error);
       throw ApiException(
         code: errorMap['code'] as String?,
-        message: errorMap['message'] as String? ?? 'Yêu cầu tin nhắn thất bại.',
+        message:
+            errorMap['message'] as String? ?? 'Chat request failed unexpectedly.',
       );
     }
 
-    throw const ApiException(message: 'Yêu cầu tin nhắn thất bại.');
+    throw const ApiException(message: 'Chat request failed unexpectedly.');
   }
 
   void _debug(String message) {
@@ -289,42 +354,340 @@ class SocketIoChatRealtimeClient
 
   void _bindSocketEvents(io.Socket socket) {
     socket
-      ..on('user_typing_start', (payload) {
-        final event = _typingEvent(payload);
-        if (event != null) {
-          _typingStartedController.add(event);
+      ..on('domain_event', (payload) {
+        final event = _mapOrNull(payload);
+        if (event == null) {
+          return;
         }
+        final type = event['type'] as String?;
+        if (type == null || type.isEmpty) {
+          return;
+        }
+        _dispatchEvent(
+          type: type,
+          payload: event['payload'],
+          eventId: event['eventId'] as String?,
+          orderingKey: event['orderingKey'] as String?,
+          orderingValue: event['orderingValue']?.toString(),
+        );
+      })
+      ..on('user_typing_start', (payload) {
+        _dispatchEvent(type: 'user_typing_start', payload: payload);
       })
       ..on('user_typing_stop', (payload) {
-        final event = _typingEvent(payload);
-        if (event != null) {
-          _typingStoppedController.add(event);
-        }
+        _dispatchEvent(type: 'user_typing_stop', payload: payload);
       })
       ..on('new_message', (payload) {
-        final event = _messageEvent(payload);
-        if (event != null) {
-          _messageReceivedController.add(event);
-        }
+        _dispatchEvent(type: 'new_message', payload: payload);
       })
       ..on('message_sent', (payload) {
-        final event = _messageSentEvent(payload);
-        if (event != null) {
-          _messageSentController.add(event);
-        }
+        _dispatchEvent(type: 'message_sent', payload: payload);
       })
       ..on('message_failed', (payload) {
-        final event = _messageFailedEvent(payload);
-        if (event != null) {
-          _messageFailedController.add(event);
-        }
+        _dispatchEvent(type: 'message_failed', payload: payload);
       })
       ..on('message_seen', (payload) {
-        final event = _messageSeenEvent(payload);
-        if (event != null) {
-          _messageSeenController.add(event);
-        }
+        _dispatchEvent(type: 'message_seen', payload: payload);
       });
+  }
+
+  void _dispatchEvent({
+    required String type,
+    required Object? payload,
+    String? eventId,
+    String? orderingKey,
+    String? orderingValue,
+  }) {
+    final normalizedPayload = _normalizePayload(payload);
+    final normalizedEventId = eventId ?? normalizedPayload['eventId'] as String?;
+    final normalizedOrderingKey =
+        orderingKey ?? normalizedPayload['orderingKey'] as String?;
+    final normalizedOrderingValue = orderingValue ??
+        (normalizedPayload['orderingValue'] as String? ??
+            normalizedPayload['orderingVersion']?.toString());
+
+    if (!_shouldApplyEvent(
+      eventId: normalizedEventId,
+      orderingKey: normalizedOrderingKey,
+      orderingValue: normalizedOrderingValue,
+    )) {
+      return;
+    }
+
+    switch (type) {
+      case 'user_typing_start':
+        final typing = _typingEvent(normalizedPayload);
+        if (typing != null) {
+          _typingStartedController.add(typing);
+        }
+        break;
+      case 'user_typing_stop':
+        final typing = _typingEvent(normalizedPayload);
+        if (typing != null) {
+          _typingStoppedController.add(typing);
+        }
+        break;
+      case 'new_message':
+        final messageEvent = _messageEvent(normalizedPayload);
+        if (messageEvent != null) {
+          _messageReceivedController.add(messageEvent);
+        }
+        break;
+      case 'message_sent':
+        final sentEvent = _messageSentEvent(normalizedPayload);
+        if (sentEvent != null) {
+          _messageSentController.add(sentEvent);
+        }
+        break;
+      case 'message_failed':
+        final failedEvent = _messageFailedEvent(normalizedPayload);
+        if (failedEvent != null) {
+          _messageFailedController.add(failedEvent);
+        }
+        break;
+      case 'message_seen':
+        final seenEvent = _messageSeenEvent(normalizedPayload);
+        if (seenEvent != null) {
+          _messageSeenController.add(seenEvent);
+        }
+        break;
+      default:
+        break;
+    }
+
+    RealtimeEventBus.instance.emit(
+      RealtimeAppEvent(
+        type: type,
+        payload: normalizedPayload,
+        eventId: normalizedEventId,
+        orderingKey: normalizedOrderingKey,
+        orderingValue: normalizedOrderingValue,
+      ),
+    );
+
+    if (normalizedEventId != null && normalizedEventId.isNotEmpty) {
+      unawaited(_eventCursorStore.writeLastEventId(normalizedEventId));
+    }
+  }
+
+  Map<String, dynamic> _normalizePayload(Object? payload) {
+    final asMap = _mapOrNull(payload) ?? const <String, dynamic>{};
+    if (asMap['payload'] is Map) {
+      return {
+        ...Map<String, dynamic>.from(asMap['payload'] as Map),
+        if (asMap['eventId'] is String) 'eventId': asMap['eventId'],
+        if (asMap['orderingKey'] is String) 'orderingKey': asMap['orderingKey'],
+        if (asMap['orderingValue'] != null)
+          'orderingValue': asMap['orderingValue'].toString(),
+      };
+    }
+    return asMap;
+  }
+
+  bool _shouldApplyEvent({
+    required String? eventId,
+    required String? orderingKey,
+    required String? orderingValue,
+  }) {
+    if (eventId != null && eventId.isNotEmpty) {
+      if (_seenEventIds.contains(eventId)) {
+        return false;
+      }
+      _seenEventIds.add(eventId);
+      _seenEventQueue.add(eventId);
+      if (_seenEventQueue.length > _maxSeenEventIds) {
+        final removed = _seenEventQueue.removeFirst();
+        _seenEventIds.remove(removed);
+      }
+    }
+
+    if (orderingKey == null ||
+        orderingKey.isEmpty ||
+        orderingValue == null ||
+        orderingValue.isEmpty) {
+      return true;
+    }
+
+    final previous = _latestOrderingByKey[orderingKey];
+    if (previous != null && _compareOrdering(orderingValue, previous) <= 0) {
+      return false;
+    }
+
+    _latestOrderingByKey[orderingKey] = orderingValue;
+    return true;
+  }
+
+  int _compareOrdering(String next, String current) {
+    final nextInt = int.tryParse(next);
+    final currentInt = int.tryParse(current);
+    if (nextInt != null && currentInt != null) {
+      return nextInt.compareTo(currentInt);
+    }
+
+    final nextTime = DateTime.tryParse(next);
+    final currentTime = DateTime.tryParse(current);
+    if (nextTime != null && currentTime != null) {
+      return nextTime.compareTo(currentTime);
+    }
+
+    return next.compareTo(current);
+  }
+
+  bool _isTokenExpiredError(Object error) {
+    final message = error.toString().toLowerCase();
+    return message.contains('jwt expired') ||
+        message.contains('auth_token_expired') ||
+        message.contains('invalid_token');
+  }
+
+  bool _isAuthExpiredApiError(ApiException error) {
+    final code = error.code?.toUpperCase();
+    final message = error.message.toLowerCase();
+    return code == 'AUTH_TOKEN_EXPIRED' ||
+        code == 'INVALID_TOKEN' ||
+        message.contains('jwt expired');
+  }
+
+  Future<bool> _refreshAccessToken() async {
+    final refreshToken = await _tokenStore.readRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      return false;
+    }
+
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: _baseUrl,
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 20),
+        validateStatus: (_) => true,
+      ),
+    );
+
+    try {
+      final response = await dio.post<Object?>(
+        '/auth/refresh',
+        data: {'refreshToken': refreshToken},
+      );
+      final body = response.data;
+      if (body is! Map<String, dynamic>) {
+        return false;
+      }
+
+      final success = body['success'] == true;
+      final data = body['data'];
+      if (!success || data is! Map<String, dynamic>) {
+        return false;
+      }
+
+      final nextAccessToken = data['accessToken'] as String?;
+      final nextRefreshToken = data['refreshToken'] as String?;
+      if (nextAccessToken == null ||
+          nextAccessToken.isEmpty ||
+          nextRefreshToken == null ||
+          nextRefreshToken.isEmpty) {
+        return false;
+      }
+
+      await _tokenStore.writeToken(nextAccessToken);
+      await _tokenStore.writeRefreshToken(nextRefreshToken);
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      dio.close();
+    }
+  }
+
+  Future<void> _resubscribeRooms() async {
+    if (_joinedConversationIds.isEmpty && _joinedRooms.isEmpty) {
+      return;
+    }
+
+    for (final room in _joinedRooms) {
+      try {
+        await _emitWithAck('subscribe_rooms', {
+      'rooms': [room],
+    });
+      } catch (error) {
+        _debug('Failed to resubscribe room $room: $error');
+      }
+    }
+
+    final roomIds = List<String>.from(_joinedConversationIds);
+    for (final conversationId in roomIds) {
+      try {
+        await _emitWithAck('join_conversation', {
+          'conversationId': conversationId,
+        });
+      } catch (error) {
+        _debug('Failed to resubscribe room $conversationId: $error');
+      }
+    }
+  }
+
+  Future<void> _syncMissedEvents({List<String> rooms = const []}) async {
+    final sinceEventId = await _eventCursorStore.readLastEventId();
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: _baseUrl,
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 20),
+        validateStatus: (_) => true,
+      ),
+    );
+
+    final token = await _tokenStore.readToken();
+    if (token != null && token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
+
+    try {
+      final response = await dio.get<Object?>(
+        '/sync/events',
+        queryParameters: {
+          if (sinceEventId != null && sinceEventId.isNotEmpty)
+            'sinceEventId': sinceEventId,
+          if (rooms.isNotEmpty) 'rooms': rooms.join(','),
+        },
+      );
+      final body = response.data;
+      if (body is! Map<String, dynamic> || body['success'] != true) {
+        return;
+      }
+
+      final data = body['data'];
+      if (data is! Map<String, dynamic>) {
+        return;
+      }
+
+      final items = data['items'];
+      if (items is! List) {
+        return;
+      }
+
+      for (final raw in items) {
+        if (raw is! Map) {
+          continue;
+        }
+        final event = Map<String, dynamic>.from(raw);
+        final type = event['type'] as String?;
+        if (type == null || type.isEmpty) {
+          continue;
+        }
+
+        _dispatchEvent(
+          type: type,
+          payload: event['payload'],
+          eventId: event['eventId'] as String?,
+          orderingKey: event['orderingKey'] as String?,
+          orderingValue: event['orderingValue']?.toString(),
+        );
+      }
+    } catch (error) {
+      _debug('Sync missed events failed: $error');
+    } finally {
+      dio.close();
+    }
   }
 
   ChatTypingEvent? _typingEvent(Object? payload) {
@@ -380,7 +743,7 @@ class SocketIoChatRealtimeClient
     return ChatMessageFailedEvent(
       conversationId: conversationId,
       clientTempId: clientTempId,
-      message: error?['message'] as String? ?? 'Yêu cầu tin nhắn thất bại.',
+      message: error?['message'] as String? ?? 'Chat request failed unexpectedly.',
     );
   }
 
@@ -424,4 +787,29 @@ class SocketIoChatRealtimeClient
   static void _defaultDebugLog(String message) {
     developer.log(message, name: 'Socket.IO');
   }
+
+  Future<void> _joinDefaultRooms() async {
+    _joinedRooms.add('feed:global');
+    try {
+      await _emitWithAck('subscribe_rooms', {
+        'rooms': ['feed:global'],
+      });
+    } catch (error) {
+      _debug('Failed to join default room feed:global: $error');
+    }
+  }
+
+  String _realtimeUrl(String baseUrl) {
+    final uri = Uri.tryParse(baseUrl);
+    if (uri == null) {
+      return '$baseUrl/realtime';
+    }
+    final segments = List<String>.from(uri.pathSegments)
+      ..removeWhere((segment) => segment.isEmpty);
+    if (segments.isEmpty || segments.last != 'realtime') {
+      segments.add('realtime');
+    }
+    return uri.replace(pathSegments: segments).toString();
+  }
 }
+
