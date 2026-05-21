@@ -264,20 +264,32 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
       ..add(socketService.messageSeen.listen(_handleMessageSeen));
   }
 
+  /// Notifies the socket that the user started typing.
+  /// Errors are silently ignored — typing indicators are best-effort.
   Future<void> typingStart() async {
     if (AppConfig.uiPreviewMode) {
       return;
     }
 
-    await _socketService?.typingStart(state.conversation.id);
+    try {
+      await _socketService?.typingStart(state.conversation.id);
+    } catch (_) {
+      // Typing is fire-and-forget; a disconnected socket must not crash the UI.
+    }
   }
 
+  /// Notifies the socket that the user stopped typing.
+  /// Errors are silently ignored — typing indicators are best-effort.
   Future<void> typingStop() async {
     if (AppConfig.uiPreviewMode) {
       return;
     }
 
-    await _socketService?.typingStop(state.conversation.id);
+    try {
+      await _socketService?.typingStop(state.conversation.id);
+    } catch (_) {
+      // Typing is fire-and-forget; a disconnected socket must not crash the UI.
+    }
   }
 
   /// Deletes one of the current user's messages through the REST API.

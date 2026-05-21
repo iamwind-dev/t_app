@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import 'chat_user.dart';
+import 'socket_payload_normalizer.dart';
 
 enum MessageDeliveryStatus { sending, sent, seen, failed }
 
@@ -21,22 +22,26 @@ class ChatMessage extends Equatable {
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
-    final content = json['content'] as String? ?? json['text'] as String? ?? '';
+    final normalizedJson = coerceSocketPayloadMap(json) ?? json;
+    final senderJson = coerceSocketPayloadMap(normalizedJson['sender']);
+    final content = normalizedJson['content'] as String? ??
+        normalizedJson['text'] as String? ??
+        '';
 
     return ChatMessage(
-      id: json['id'] as String,
-      clientTempId: json['clientTempId'] as String?,
-      conversationId: json['conversationId'] as String,
-      sender: ChatUser.fromJson(json['sender'] as Map<String, dynamic>),
-      type: json['type'] as String? ?? 'text',
+      id: normalizedJson['id'] as String,
+      clientTempId: normalizedJson['clientTempId'] as String?,
+      conversationId: normalizedJson['conversationId'] as String,
+      sender: ChatUser.fromJson(senderJson ?? const <String, dynamic>{}),
+      type: normalizedJson['type'] as String? ?? 'text',
       content: content,
-      text: json['text'] as String?,
-      mediaUrl: json['mediaUrl'] as String?,
-      deletedAt: json['deletedAt'] == null
+      text: normalizedJson['text'] as String?,
+      mediaUrl: normalizedJson['mediaUrl'] as String?,
+      deletedAt: normalizedJson['deletedAt'] == null
           ? null
-          : DateTime.parse(json['deletedAt'] as String),
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+          : DateTime.parse(normalizedJson['deletedAt'] as String),
+      createdAt: DateTime.parse(normalizedJson['createdAt'] as String),
+      updatedAt: DateTime.parse(normalizedJson['updatedAt'] as String),
     );
   }
 

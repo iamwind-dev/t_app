@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 import 'package:t_app/core/network/backend_url_normalizer.dart';
 
+import 'socket_payload_normalizer.dart';
+
 class ChatUser extends Equatable {
   const ChatUser({
     required this.id,
@@ -10,13 +12,17 @@ class ChatUser extends Equatable {
   });
 
   factory ChatUser.fromJson(Map<String, dynamic> json) {
+    final normalizedJson = coerceSocketPayloadMap(json) ?? json;
     final rawAvatarUrl =
-        json['avatarUrl'] ?? json['avatar_url'] ?? json['avatar'];
+        normalizedJson['avatarUrl'] ??
+        normalizedJson['avatar_url'] ??
+        normalizedJson['avatar'];
 
     return ChatUser(
-      id: json['id'] as String,
-      username: json['username'] as String,
-      displayName: json['displayName'] as String? ?? json['username'] as String,
+      id: normalizedJson['id'] as String,
+      username: normalizedJson['username'] as String,
+      displayName: normalizedJson['displayName'] as String? ??
+          normalizedJson['username'] as String,
       avatarUrl: BackendUrlNormalizer.normalizeNullable(
         rawAvatarUrl as String?,
       ),

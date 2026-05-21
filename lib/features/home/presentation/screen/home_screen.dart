@@ -126,17 +126,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  FeedUser _buildFeedCurrentUser(HomeState state, AuthUser? authUser) {
-    final username = authUser?.username ?? state.currentUser.username;
-    final avatarUrl = authUser?.avatarUrl;
-
-    return FeedUser(
-      username: username,
-      avatarAsset: avatarUrl != null && avatarUrl.isNotEmpty
-          ? avatarUrl
-          : state.currentUser.avatarAsset,
-    );
-  }
 
   Future<void> _openCreateThreadSheet(
     HomeState state,
@@ -213,10 +202,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _syncOnResume() async {
     final socketService = context.read<ChatSocketService>();
+    final homeCubit = context.read<HomeCubit>();
     await socketService.syncEvents(rooms: const ['feed:global']);
-    await context.read<HomeCubit>().syncIfStale(
-          maxAge: const Duration(minutes: 1),
-        );
+    await homeCubit.syncIfStale(
+      maxAge: const Duration(minutes: 1),
+    );
   }
 
   @override
@@ -301,7 +291,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               itemBuilder: (context, index) {
                                 if (index == 0) {
                                   return CreatePostCard(
-                                    currentUser: _buildFeedCurrentUser(
+                                    currentUser: _buildCurrentUser(
                                       state,
                                       currentUser,
                                     ),

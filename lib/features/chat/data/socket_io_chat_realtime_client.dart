@@ -11,6 +11,7 @@ import 'package:t_app/core/realtime/realtime_event_cursor_store.dart';
 
 import 'chat_message.dart';
 import 'chat_realtime_client.dart';
+import 'socket_payload_normalizer.dart';
 import 'chat_socket_service.dart';
 
 typedef SocketDebugLog = void Function(String message);
@@ -51,7 +52,8 @@ class SocketIoChatRealtimeClient
   final Map<String, String> _latestOrderingByKey = <String, String>{};
   final Set<String> _joinedRooms = <String>{};
   static const int _maxSeenEventIds = 500;
-  io.Socket? _socket;
+  io.Socket? _chatSocket;
+  io.Socket? _realtimeSocket;
 
   @override
   Stream<ChatConnectionStatus> get connectionStatus =>
@@ -83,20 +85,28 @@ class SocketIoChatRealtimeClient
   }
 
   Future<void> _connect({required bool allowRefresh}) async {
-    final existing = _socket;
-    if (existing?.connected == true) {
+    final chatExisting = _chatSocket;
+    final realtimeExisting = _realtimeSocket;
+    if (chatExisting?.connected == true && realtimeExisting?.connected == true) {
       return;
     }
 
-    final token = await _tokenStore.readToken();
+    final token = _normalizeSocketAuthToken(await _tokenStore.readToken());
     if (token == null || token.isEmpty) {
       _debug('Socket.IO cannot connect: missing auth token.');
       throw const ApiException(message: 'Can not connect chat without login.');
     }
 
     _connectionStatusController.add(ChatConnectionStatus.connecting);
-    final completer = Completer<void>();
-    final socket = io.io(
+    final chatSocket = io.io(
+      _chatUrl(_baseUrl),
+      io.OptionBuilder()
+          .setTransports(['websocket'])
+          .setAuth({'token': token})
+          .disableAutoConnect()
+          .build(),
+    );
+    final realtimeSocket = io.io(
       _realtimeUrl(_baseUrl),
       io.OptionBuilder()
           .setTransports(['websocket'])
@@ -104,33 +114,15 @@ class SocketIoChatRealtimeClient
           .disableAutoConnect()
           .build(),
     );
-    _socket = socket;
-    _bindSocketEvents(socket);
-
-    socket
-      ..once('connect', (_) {
-        _connectionStatusController.add(ChatConnectionStatus.connected);
-        if (!completer.isCompleted) {
-          completer.complete();
-        }
-      })
-      ..on('disconnect', (_) {
-        _connectionStatusController.add(ChatConnectionStatus.disconnected);
-      })
-      ..once('connect_error', (error) {
-        _debug('Socket.IO connect_error: $error');
-        _connectionStatusController.add(ChatConnectionStatus.disconnected);
-        if (!completer.isCompleted) {
-          completer.completeError(error ?? 'unknown_error');
-        }
-      })
-      ..connect();
+    _chatSocket = chatSocket;
+    _realtimeSocket = realtimeSocket;
+    _bindChatSocketEvents(chatSocket);
+    _bindRealtimeSocketEvents(realtimeSocket);
 
     try {
-      await completer.future.timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw 'connect_timeout',
-      );
+      await _waitForSocketConnection(chatSocket, label: 'chat');
+      await _waitForSocketConnection(realtimeSocket, label: 'realtime');
+      _connectionStatusController.add(ChatConnectionStatus.connected);
       await _joinDefaultRooms();
       await _resubscribeRooms();
       await _syncMissedEvents(rooms: _joinedRooms.toList(growable: false));
@@ -150,22 +142,25 @@ class SocketIoChatRealtimeClient
 
   @override
   Future<void> disconnect() async {
-    _socket?.disconnect();
-    _socket?.dispose();
-    _socket = null;
+    _chatSocket?.disconnect();
+    _chatSocket?.dispose();
+    _chatSocket = null;
+    _realtimeSocket?.disconnect();
+    _realtimeSocket?.dispose();
+    _realtimeSocket = null;
     _connectionStatusController.add(ChatConnectionStatus.disconnected);
   }
 
   @override
   Future<void> joinConversation(String conversationId) async {
     await connect();
-    await _emitWithAck('join_conversation', {'conversationId': conversationId});
+    await _emitChatWithAck('join_conversation', {'conversationId': conversationId});
     _joinedConversationIds.add(conversationId);
   }
 
   @override
   Future<void> leaveConversation(String conversationId) async {
-    await _emitWithAck('leave_conversation', {
+    await _emitChatWithAck('leave_conversation', {
       'conversationId': conversationId,
     });
     _joinedConversationIds.remove(conversationId);
@@ -177,7 +172,7 @@ class SocketIoChatRealtimeClient
       return;
     }
     await connect();
-    await _emitWithAck('subscribe_rooms', {
+    await _emitRealtimeWithAck('subscribe_rooms', {
       'rooms': [room],
     });
     _joinedRooms.add(room);
@@ -188,7 +183,7 @@ class SocketIoChatRealtimeClient
     if (room.trim().isEmpty) {
       return;
     }
-    await _emitWithAck('unsubscribe_rooms', {
+    await _emitRealtimeWithAck('unsubscribe_rooms', {
       'rooms': [room],
     });
     _joinedRooms.remove(room);
@@ -201,12 +196,12 @@ class SocketIoChatRealtimeClient
 
   @override
   Future<void> typingStart(String conversationId) async {
-    await _emitWithAck('typing_start', {'conversationId': conversationId});
+    await _emitChatWithAck('typing_start', {'conversationId': conversationId});
   }
 
   @override
   Future<void> typingStop(String conversationId) async {
-    await _emitWithAck('typing_stop', {'conversationId': conversationId});
+    await _emitChatWithAck('typing_stop', {'conversationId': conversationId});
   }
 
   @override
@@ -214,7 +209,7 @@ class SocketIoChatRealtimeClient
     required String conversationId,
     required String messageId,
   }) async {
-    await _emitWithAck('mark_seen', {
+    await _emitChatWithAck('mark_seen', {
       'conversationId': conversationId,
       'messageId': messageId,
     });
@@ -271,7 +266,7 @@ class SocketIoChatRealtimeClient
     String? mediaUrl,
   }) async {
     await connect();
-    return _emitWithAck('send_message', {
+    return _emitChatWithAck('send_message', {
       'conversationId': conversationId,
       if (clientTempId != null) 'clientTempId': clientTempId,
       'content': content,
@@ -280,11 +275,33 @@ class SocketIoChatRealtimeClient
     });
   }
 
-  Future<Map<String, dynamic>> _emitWithAck(
+  Future<Map<String, dynamic>> _emitChatWithAck(
     String event,
     Map<String, Object?> payload,
-  ) async {
-    final socket = _socket;
+  ) {
+    return _emitWithAck(
+      socket: _chatSocket,
+      event: event,
+      payload: payload,
+    );
+  }
+
+  Future<Map<String, dynamic>> _emitRealtimeWithAck(
+    String event,
+    Map<String, Object?> payload,
+  ) {
+    return _emitWithAck(
+      socket: _realtimeSocket,
+      event: event,
+      payload: payload,
+    );
+  }
+
+  Future<Map<String, dynamic>> _emitWithAck({
+    required io.Socket? socket,
+    required String event,
+    required Map<String, Object?> payload,
+  }) async {
     if (socket == null) {
       _debug('Socket.IO emit blocked for $event: socket unavailable.');
       throw const ApiException(message: 'Chat connection is unavailable.');
@@ -314,8 +331,12 @@ class SocketIoChatRealtimeClient
       );
     } on ApiException catch (error) {
       if (_isAuthExpiredApiError(error) && await _refreshAccessToken()) {
+        final isRealtimeSocket = identical(socket, _realtimeSocket);
         await _connect(allowRefresh: false);
-        return _emitWithAck(event, payload);
+        if (isRealtimeSocket) {
+          return _emitRealtimeWithAck(event, payload);
+        }
+        return _emitChatWithAck(event, payload);
       }
       rethrow;
     }
@@ -352,24 +373,10 @@ class SocketIoChatRealtimeClient
     _debugLog(message);
   }
 
-  void _bindSocketEvents(io.Socket socket) {
+  void _bindChatSocketEvents(io.Socket socket) {
     socket
-      ..on('domain_event', (payload) {
-        final event = _mapOrNull(payload);
-        if (event == null) {
-          return;
-        }
-        final type = event['type'] as String?;
-        if (type == null || type.isEmpty) {
-          return;
-        }
-        _dispatchEvent(
-          type: type,
-          payload: event['payload'],
-          eventId: event['eventId'] as String?,
-          orderingKey: event['orderingKey'] as String?,
-          orderingValue: event['orderingValue']?.toString(),
-        );
+      ..on('disconnect', (_) {
+        _connectionStatusController.add(ChatConnectionStatus.disconnected);
       })
       ..on('user_typing_start', (payload) {
         _dispatchEvent(type: 'user_typing_start', payload: payload);
@@ -388,6 +395,30 @@ class SocketIoChatRealtimeClient
       })
       ..on('message_seen', (payload) {
         _dispatchEvent(type: 'message_seen', payload: payload);
+      });
+  }
+
+  void _bindRealtimeSocketEvents(io.Socket socket) {
+    socket
+      ..on('disconnect', (_) {
+        _connectionStatusController.add(ChatConnectionStatus.disconnected);
+      })
+      ..on('domain_event', (payload) {
+        final event = _mapOrNull(payload);
+        if (event == null) {
+          return;
+        }
+        final type = event['type'] as String?;
+        if (type == null || type.isEmpty) {
+          return;
+        }
+        _dispatchEvent(
+          type: type,
+          payload: event['payload'],
+          eventId: event['eventId'] as String?,
+          orderingKey: event['orderingKey'] as String?,
+          orderingValue: event['orderingValue']?.toString(),
+        );
       });
   }
 
@@ -605,9 +636,9 @@ class SocketIoChatRealtimeClient
 
     for (final room in _joinedRooms) {
       try {
-        await _emitWithAck('subscribe_rooms', {
-      'rooms': [room],
-    });
+        await _emitRealtimeWithAck('subscribe_rooms', {
+          'rooms': [room],
+        });
       } catch (error) {
         _debug('Failed to resubscribe room $room: $error');
       }
@@ -616,7 +647,7 @@ class SocketIoChatRealtimeClient
     final roomIds = List<String>.from(_joinedConversationIds);
     for (final conversationId in roomIds) {
       try {
-        await _emitWithAck('join_conversation', {
+        await _emitChatWithAck('join_conversation', {
           'conversationId': conversationId,
         });
       } catch (error) {
@@ -778,10 +809,7 @@ class SocketIoChatRealtimeClient
   }
 
   Map<String, dynamic>? _mapOrNull(Object? value) {
-    if (value is Map) {
-      return Map<String, dynamic>.from(value);
-    }
-    return null;
+    return coerceSocketPayloadMap(value);
   }
 
   static void _defaultDebugLog(String message) {
@@ -791,7 +819,7 @@ class SocketIoChatRealtimeClient
   Future<void> _joinDefaultRooms() async {
     _joinedRooms.add('feed:global');
     try {
-      await _emitWithAck('subscribe_rooms', {
+      await _emitRealtimeWithAck('subscribe_rooms', {
         'rooms': ['feed:global'],
       });
     } catch (error) {
@@ -810,6 +838,66 @@ class SocketIoChatRealtimeClient
       segments.add('realtime');
     }
     return uri.replace(pathSegments: segments).toString();
+  }
+
+  String _chatUrl(String baseUrl) {
+    final uri = Uri.tryParse(baseUrl);
+    if (uri == null) {
+      return baseUrl;
+    }
+    return uri.replace(pathSegments: const <String>[]).toString();
+  }
+
+  String? _normalizeSocketAuthToken(String? token) {
+    if (token == null) {
+      return null;
+    }
+
+    var normalized = token.trim();
+    if (normalized.isEmpty) {
+      return null;
+    }
+
+    if ((normalized.startsWith('"') && normalized.endsWith('"')) ||
+        (normalized.startsWith("'") && normalized.endsWith("'"))) {
+      normalized = normalized.substring(1, normalized.length - 1).trim();
+    }
+
+    final lower = normalized.toLowerCase();
+    if (lower.startsWith('bearer ')) {
+      normalized = normalized.substring(7).trim();
+    }
+
+    if (normalized.isEmpty) {
+      return null;
+    }
+
+    return normalized;
+  }
+
+  Future<void> _waitForSocketConnection(
+    io.Socket socket, {
+    required String label,
+  }) async {
+    final completer = Completer<void>();
+    socket
+      ..once('connect', (_) {
+        if (!completer.isCompleted) {
+          completer.complete();
+        }
+      })
+      ..once('connect_error', (error) {
+        _debug('Socket.IO $label connect_error: $error');
+        if (!completer.isCompleted) {
+          completer.completeError(error ?? 'unknown_error');
+        }
+      })
+      ..connect();
+
+    await completer.future.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => throw '${label}_connect_timeout',
+    );
   }
 }
 
