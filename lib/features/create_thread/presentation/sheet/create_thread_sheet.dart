@@ -10,6 +10,7 @@ import 'package:t_app/features/post_detail/data/models/user.dart';
 import 'package:t_app/features/post_detail/presentation/widget/avatar_view.dart';
 import 'package:t_app/features/uploads/data/upload_image_result.dart';
 import 'package:t_app/features/uploads/domain/uploads_image_repository.dart';
+import 'package:t_app/features/posts/data/moderated_thread_submission.dart';
 
 enum ComposerMode { create, reply }
 
@@ -58,17 +59,19 @@ class ThreadComposerSubmitRequest {
 }
 
 typedef ThreadComposerSubmitCallback =
-    Future<void> Function(ThreadComposerSubmitRequest request);
+    Future<ModeratedThreadSubmission> Function(ThreadComposerSubmitRequest request);
 
 Future<void> showCreateThreadSheet({
   required BuildContext context,
   required User currentUser,
   ThreadComposerSubmitCallback? onSubmit,
+  void Function(ModeratedThreadSubmission)? onSubmissionAccepted,
 }) {
   return showThreadComposerSheet(
     context: context,
     currentUser: currentUser,
     onSubmit: onSubmit,
+    onSubmissionAccepted: onSubmissionAccepted,
   );
 }
 
@@ -78,6 +81,7 @@ Future<void> showThreadComposerSheet({
   ComposerMode mode = ComposerMode.create,
   ThreadComposerReplyContext? replyContext,
   ThreadComposerSubmitCallback? onSubmit,
+  void Function(ModeratedThreadSubmission)? onSubmissionAccepted,
 }) {
   final uploadsRepository = context.read<UploadsImageRepository>();
 
@@ -93,6 +97,7 @@ Future<void> showThreadComposerSheet({
         mode: mode,
         replyContext: replyContext,
         onSubmit: onSubmit,
+        onSubmissionAccepted: onSubmissionAccepted,
       );
     },
   );
@@ -108,6 +113,7 @@ class ThreadComposerSheet extends StatefulWidget {
     this.mode = ComposerMode.create,
     this.replyContext,
     this.onSubmit,
+    this.onSubmissionAccepted,
   });
 
   final User currentUser;
@@ -115,6 +121,7 @@ class ThreadComposerSheet extends StatefulWidget {
   final ComposerMode mode;
   final ThreadComposerReplyContext? replyContext;
   final ThreadComposerSubmitCallback? onSubmit;
+  final void Function(ModeratedThreadSubmission)? onSubmissionAccepted;
 
   @override
   State<ThreadComposerSheet> createState() => _ThreadComposerSheetState();
@@ -354,8 +361,9 @@ class _ThreadComposerSheetState extends State<ThreadComposerSheet>
         return;
       }
 
+      ModeratedThreadSubmission? submission;
       if (widget.onSubmit != null) {
-        await widget.onSubmit!(
+        submission = await widget.onSubmit!(
           ThreadComposerSubmitRequest(
             mode: widget.mode,
             items: items,
@@ -368,6 +376,10 @@ class _ThreadComposerSheetState extends State<ThreadComposerSheet>
       setState(() {
         _postState = PostState.postingSuccess;
       });
+
+      if (submission != null && widget.onSubmissionAccepted != null) {
+        widget.onSubmissionAccepted!(submission);
+      }
 
       await Future<void>.delayed(const Duration(milliseconds: 1200));
       if (!mounted) {
@@ -521,7 +533,6 @@ class ThreadComposerHeader extends StatelessWidget {
 
 class _ThreadDraftComposer extends StatelessWidget {
   const _ThreadDraftComposer({
-    super.key,
     required this.currentUser,
     required this.draft,
     required this.controllers,
@@ -658,7 +669,6 @@ class ReplyContextPreview extends StatelessWidget {
 
 class _ThreadDraftItemComposer extends StatelessWidget {
   const _ThreadDraftItemComposer({
-    super.key,
     required this.currentUser,
     required this.controller,
     required this.focusNode,
@@ -720,12 +730,9 @@ class _ThreadDraftItemComposer extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
-                  CircleAvatar(
+                  AvatarView(
+                    user: currentUser,
                     radius: smallAvatarRadius,
-                    backgroundColor: colorScheme.surfaceContainerHighest,
-                    backgroundImage: currentUser.avatarAssetPath == null
-                        ? null
-                        : AssetImage(currentUser.avatarAssetPath!),
                   ),
                 ],
               ],
@@ -844,7 +851,6 @@ class ComposerToolbar extends StatelessWidget {
 
 class _ComposerImageStrip extends StatelessWidget {
   const _ComposerImageStrip({
-    super.key,
     required this.attachments,
     required this.onRemoveImage,
   });
@@ -873,7 +879,6 @@ class _ComposerImageStrip extends StatelessWidget {
 
 class _ComposerImageCard extends StatelessWidget {
   const _ComposerImageCard({
-    super.key,
     required this.attachment,
     required this.onRemove,
   });
@@ -941,12 +946,9 @@ class AddToThreadRow extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Row(
         children: [
-          CircleAvatar(
+          AvatarView(
+            user: currentUser,
             radius: 11,
-            backgroundColor: colorScheme.surfaceContainerHighest,
-            backgroundImage: currentUser.avatarAssetPath == null
-                ? null
-                : AssetImage(currentUser.avatarAssetPath!),
           ),
           const SizedBox(width: 10),
           Text(

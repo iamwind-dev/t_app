@@ -14,6 +14,9 @@ class ChatThreadState extends Equatable {
     this.typingUsers = const {},
     this.connectionStatus = ChatConnectionStatus.disconnected,
     this.errorMessage,
+    this.isLoadingOlder = false,
+    this.hasMoreOlder = true,
+    this.olderCursor,
   });
 
   final ChatThreadStatus status;
@@ -23,6 +26,9 @@ class ChatThreadState extends Equatable {
   final Map<String, String> typingUsers;
   final ChatConnectionStatus connectionStatus;
   final String? errorMessage;
+  final bool isLoadingOlder;
+  final bool hasMoreOlder;
+  final String? olderCursor;
 
   ChatThreadState copyWith({
     ChatThreadStatus? status,
@@ -31,6 +37,10 @@ class ChatThreadState extends Equatable {
     ChatConnectionStatus? connectionStatus,
     String? errorMessage,
     bool clearError = false,
+    bool? isLoadingOlder,
+    bool? hasMoreOlder,
+    String? olderCursor,
+    bool clearOlderCursor = false,
   }) {
     return ChatThreadState(
       status: status ?? this.status,
@@ -40,6 +50,9 @@ class ChatThreadState extends Equatable {
       typingUsers: typingUsers ?? this.typingUsers,
       connectionStatus: connectionStatus ?? this.connectionStatus,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
+      isLoadingOlder: isLoadingOlder ?? this.isLoadingOlder,
+      hasMoreOlder: hasMoreOlder ?? this.hasMoreOlder,
+      olderCursor: clearOlderCursor ? null : olderCursor ?? this.olderCursor,
     );
   }
 
@@ -52,5 +65,8 @@ class ChatThreadState extends Equatable {
     typingUsers,
     connectionStatus,
     errorMessage,
+    isLoadingOlder,
+    hasMoreOlder,
+    olderCursor,
   ];
 }

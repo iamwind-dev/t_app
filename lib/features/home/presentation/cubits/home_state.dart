@@ -25,6 +25,10 @@ class HomeState extends Equatable {
     this.rootThreads = const [],
     this.selectedTabIndex = 0,
     this.errorMessage,
+    this.isLoadingMore = false,
+    this.hasMore = true,
+    this.nextCursor,
+    this.isRefreshing = false,
   });
 
   final HomeFeedStatus status;
@@ -32,6 +36,10 @@ class HomeState extends Equatable {
   final List<ThreadItemModel> rootThreads;
   final int selectedTabIndex;
   final String? errorMessage;
+  final bool isLoadingMore;
+  final bool hasMore;
+  final String? nextCursor;
+  final bool isRefreshing;
 
   HomeState copyWith({
     HomeFeedStatus? status,
@@ -40,6 +48,11 @@ class HomeState extends Equatable {
     int? selectedTabIndex,
     String? errorMessage,
     bool clearError = false,
+    bool? isLoadingMore,
+    bool? hasMore,
+    String? nextCursor,
+    bool clearCursor = false,
+    bool? isRefreshing,
   }) {
     return HomeState(
       status: status ?? this.status,
@@ -47,6 +60,10 @@ class HomeState extends Equatable {
       rootThreads: rootThreads ?? this.rootThreads,
       selectedTabIndex: selectedTabIndex ?? this.selectedTabIndex,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      hasMore: hasMore ?? this.hasMore,
+      nextCursor: clearCursor ? null : nextCursor ?? this.nextCursor,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
     );
   }
 
@@ -57,5 +74,9 @@ class HomeState extends Equatable {
     rootThreads,
     selectedTabIndex,
     errorMessage,
+    isLoadingMore,
+    hasMore,
+    nextCursor,
+    isRefreshing,
   ];
 }

@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import 'package:intl/intl.dart';
+import 'package:t_app/core/utils/time_formatter.dart';
 import 'package:t_app/features/activity/data/models/activity_item_model.dart';
 import 'package:t_app/features/post_detail/data/models/user.dart';
 
@@ -60,7 +60,7 @@ class NotificationRecord extends Equatable {
           ? ActivityItemType.followSuggestion
           : ActivityItemType.contentRecommendation,
       user: actorUser,
-      timestampLabel: DateFormat('d/M/yyyy').format(createdAt.toLocal()),
+      timestampLabel: TimeFormatter.formatSocialTime(createdAt),
       subtitle: message,
       hasPurpleBadge: type == 'FOLLOW',
       targetType: targetType,
@@ -121,7 +121,7 @@ class NotificationActor extends Equatable {
 
 DateTime? _parseDate(Object? value) {
   if (value is String && value.isNotEmpty) {
-    return DateTime.tryParse(value);
+    return DateTime.tryParse(value)?.toLocal();
   }
 
   return null;

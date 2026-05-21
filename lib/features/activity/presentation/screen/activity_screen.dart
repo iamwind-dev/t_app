@@ -161,13 +161,13 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 return _ActivityMessage(
                   message:
                       state.errorMessage ??
-                      'KhÃ´ng thá»ƒ táº£i hoáº¡t Ä‘á»™ng.',
+                      'Chưa có hoạt động nào. Hãy thử làm mới trang hoặc quay lại sau nhé.',
                 );
               }
 
               if (items.isEmpty) {
                 return const _ActivityMessage(
-                  message: 'ChÆ°a cÃ³ hoáº¡t Ä‘á»™ng nÃ o.',
+                  message: 'Chưa có hoạt động nào. Hãy thử làm mới trang hoặc quay lại sau nhé.',
                 );
               }
 
@@ -242,7 +242,7 @@ class ActivityHeader extends StatelessWidget {
           Row(
             children: [
               Text(
-                'Hoáº¡t Ä‘á»™ng',
+                'Hoạt động',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.8,
@@ -304,9 +304,9 @@ class ActivityFilterChips extends StatelessWidget {
   final ValueChanged<ActivityFilter> onChanged;
 
   static const _entries = [
-    (ActivityFilter.all, 'Táº¥t cáº£'),
-    (ActivityFilter.follows, 'LÆ°á»£t theo dÃµi'),
-    (ActivityFilter.conversations, 'Cuá»™c trÃ² chuyá»‡n'),
+    (ActivityFilter.all, 'Tất cả'),
+    (ActivityFilter.follows, 'Lượt theo dõi'),
+    (ActivityFilter.conversations, 'Cuộc trò chuyện'),
   ];
 
   @override

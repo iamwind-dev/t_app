@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:t_app/core/config/app_config.dart';
+import 'package:t_app/core/utils/time_formatter.dart';
 import 'package:t_app/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:t_app/features/create_thread/presentation/sheet/create_thread_sheet.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 import 'package:t_app/features/post_detail/data/models/user.dart';
 import 'package:t_app/features/post_detail/data/thread_tree_updater.dart';
 import 'package:t_app/features/post_detail/presentation/widget/thread_replies_section.dart';
+import 'package:t_app/features/posts/data/moderated_thread_submission.dart';
 import 'package:t_app/features/posts/domain/posts_feed_repository.dart';
 
 class ThreadReplyScreen extends StatefulWidget {
@@ -120,7 +122,7 @@ class _ThreadReplyScreenState extends State<ThreadReplyScreen> {
       replyContext: ThreadComposerReplyContext.fromThread(targetThread),
       onSubmit: (request) async {
         if (request.primaryContent.isEmpty) {
-          return;
+          return const ModeratedThreadSubmission();
         }
 
         if (AppConfig.uiPreviewMode) {
@@ -131,25 +133,14 @@ class _ThreadReplyScreenState extends State<ThreadReplyScreen> {
             parentId: targetThread.id,
             rootThreadId: _rootThread.id,
             author: _currentUser,
-            createdAt: 'vừa xong',
+            createdAt: TimeFormatter.formatSocialTime(DateTime.now()),
             content: request.primaryContent,
             imageUrls: request.mediaUrls,
           );
-          if (!mounted) {
-            return;
-          }
-          setState(() {
-            _rootThread = _insertReply(
-              current: _rootThread,
-              targetId: targetThread.id,
-              newReply: newReply,
-            );
-            _expandedThreadIds.add(targetThread.id);
-          });
-          return;
+          return ModeratedThreadSubmission(thread: newReply);
         }
 
-        final newReply = targetThread.id == _rootThread.id
+        return targetThread.id == _rootThread.id
             ? await _postsRepository.createPostReply(
                 postId: _rootThread.id,
                 content: request.primaryContent,
@@ -160,8 +151,10 @@ class _ThreadReplyScreenState extends State<ThreadReplyScreen> {
                 content: request.primaryContent,
                 mediaUrls: request.mediaUrls,
               );
-
-        if (!mounted) {
+      },
+      onSubmissionAccepted: (submission) async {
+        final newReply = submission.thread;
+        if (newReply == null || !mounted) {
           return;
         }
 

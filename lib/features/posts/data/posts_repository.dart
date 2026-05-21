@@ -2,6 +2,8 @@ import 'package:t_app/core/network/api_client.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 import 'package:t_app/features/posts/domain/posts_feed_repository.dart';
 
+import 'moderated_thread_submission.dart';
+import 'moderation_result.dart';
 import 'post_page.dart';
 import 'reaction_result.dart';
 import 'thread_api_mapper.dart';
@@ -13,10 +15,10 @@ class PostsRepository implements PostsFeedRepository {
   final ApiClient _apiClient;
 
   @override
-  Future<PostPage> getFeed({String? cursor}) {
+  Future<PostPage> getFeed({int limit = 10, String? cursor}) {
     return _apiClient.get<PostPage>(
       '/posts/feed',
-      queryParameters: {'limit': 20, if (cursor != null) 'cursor': cursor},
+      queryParameters: {'limit': limit, if (cursor != null) 'cursor': cursor},
       decode: (value) => PostPage.fromJson(
         _asMap(value),
         itemMapper: ThreadApiMapper.postFromJson,
@@ -25,7 +27,8 @@ class PostsRepository implements PostsFeedRepository {
   }
 
   @override
-  Future<ThreadItemModel> createPost({
+  /// Creates a post and keeps the backend moderation payload attached to it.
+  Future<ModeratedThreadSubmission> createPost({
     required String content,
     List<String> mediaUrls = const <String>[],
   }) async {
@@ -35,7 +38,26 @@ class PostsRepository implements PostsFeedRepository {
       decode: _asMap,
     );
 
-    return ThreadApiMapper.postFromJson(_readObject(response, 'post'));
+    return ModeratedThreadSubmission(
+      thread: _readOptionalObject(response, 'post') == null
+          ? null
+          : ThreadApiMapper.postFromJson(_readObject(response, 'post')),
+      moderation: _readOptionalObject(response, 'moderation') == null
+          ? null
+          : ModerationResult.fromJson(_readObject(response, 'moderation')),
+    );
+  }
+
+  @override
+  /// Calls the NestJS moderation endpoint instead of the AI service directly.
+  Future<ModerationResult> checkModeration(String text) async {
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      '/moderation/check',
+      data: {'text': text},
+      decode: _asMap,
+    );
+
+    return ModerationResult.fromJson(response);
   }
 
   @override
@@ -105,10 +127,10 @@ class PostsRepository implements PostsFeedRepository {
   }
 
   @override
-  Future<PostPage> getPostReplies(String postId, {String? cursor}) {
+  Future<PostPage> getPostReplies(String postId, {int limit = 10, String? cursor}) {
     return _apiClient.get<PostPage>(
       '/posts/$postId/replies',
-      queryParameters: {'limit': 20, if (cursor != null) 'cursor': cursor},
+      queryParameters: {'limit': limit, if (cursor != null) 'cursor': cursor},
       decode: (value) => PostPage.fromJson(
         _asMap(value),
         itemMapper: ThreadApiMapper.replyFromJson,
@@ -117,10 +139,10 @@ class PostsRepository implements PostsFeedRepository {
   }
 
   @override
-  Future<PostPage> getReplyChildren(String replyId, {String? cursor}) {
+  Future<PostPage> getReplyChildren(String replyId, {int limit = 10, String? cursor}) {
     return _apiClient.get<PostPage>(
       '/replies/$replyId/children',
-      queryParameters: {'limit': 10, if (cursor != null) 'cursor': cursor},
+      queryParameters: {'limit': limit, if (cursor != null) 'cursor': cursor},
       decode: (value) => PostPage.fromJson(
         _asMap(value),
         itemMapper: ThreadApiMapper.replyFromJson,
@@ -129,7 +151,8 @@ class PostsRepository implements PostsFeedRepository {
   }
 
   @override
-  Future<ThreadItemModel> createPostReply({
+  /// Creates a reply on a post and returns both reply data and moderation.
+  Future<ModeratedThreadSubmission> createPostReply({
     required String postId,
     required String content,
     List<String> mediaUrls = const <String>[],
@@ -140,11 +163,19 @@ class PostsRepository implements PostsFeedRepository {
       decode: _asMap,
     );
 
-    return ThreadApiMapper.replyFromJson(_readObject(response, 'reply'));
+    return ModeratedThreadSubmission(
+      thread: _readOptionalObject(response, 'reply') == null
+          ? null
+          : ThreadApiMapper.replyFromJson(_readObject(response, 'reply')),
+      moderation: _readOptionalObject(response, 'moderation') == null
+          ? null
+          : ModerationResult.fromJson(_readObject(response, 'moderation')),
+    );
   }
 
   @override
-  Future<ThreadItemModel> createChildReply({
+  /// Creates a nested child reply and returns both reply data and moderation.
+  Future<ModeratedThreadSubmission> createChildReply({
     required String replyId,
     required String content,
     List<String> mediaUrls = const <String>[],
@@ -155,7 +186,14 @@ class PostsRepository implements PostsFeedRepository {
       decode: _asMap,
     );
 
-    return ThreadApiMapper.replyFromJson(_readObject(response, 'reply'));
+    return ModeratedThreadSubmission(
+      thread: _readOptionalObject(response, 'reply') == null
+          ? null
+          : ThreadApiMapper.replyFromJson(_readObject(response, 'reply')),
+      moderation: _readOptionalObject(response, 'moderation') == null
+          ? null
+          : ModerationResult.fromJson(_readObject(response, 'moderation')),
+    );
   }
 
   @override
@@ -200,6 +238,19 @@ class PostsRepository implements PostsFeedRepository {
     }
 
     throw FormatException('Response missing $key.');
+  }
+
+  /// Reads an optional nested object without forcing older payloads to fail.
+  static Map<String, dynamic>? _readOptionalObject(
+    Map<String, dynamic> response,
+    String key,
+  ) {
+    final value = response[key];
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+
+    return null;
   }
 
   static Map<String, dynamic> _asMap(Object? value) {

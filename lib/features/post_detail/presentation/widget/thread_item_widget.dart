@@ -126,6 +126,11 @@ class ThreadItemWidget extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: onTap,
+      hoverColor: Colors.transparent,
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      focusColor: Colors.transparent,
+      overlayColor: WidgetStateProperty.all(Colors.transparent),
       child: content,
     );
   }

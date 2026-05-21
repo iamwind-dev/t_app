@@ -7,7 +7,7 @@ class ChatPageInfo {
   factory ChatPageInfo.fromJson(Map<String, dynamic> json) {
     return ChatPageInfo(
       nextCursor: json['nextCursor'] as String?,
-      hasNextPage: json['hasNextPage'] as bool? ?? false,
+      hasNextPage: (json['hasNextPage'] ?? json['hasMore']) as bool? ?? false,
     );
   }
 
@@ -24,7 +24,9 @@ class ConversationPage {
           .whereType<Map<String, dynamic>>()
           .map(ChatConversation.fromJson)
           .toList(growable: false),
-      pageInfo: ChatPageInfo.fromJson(json['pageInfo'] as Map<String, dynamic>),
+      pageInfo: json['pageInfo'] is Map<String, dynamic>
+          ? ChatPageInfo.fromJson(json['pageInfo'] as Map<String, dynamic>)
+          : ChatPageInfo.fromJson(json),
     );
   }
 
@@ -41,7 +43,9 @@ class MessagePage {
           .whereType<Map<String, dynamic>>()
           .map(ChatMessage.fromJson)
           .toList(growable: false),
-      pageInfo: ChatPageInfo.fromJson(json['pageInfo'] as Map<String, dynamic>),
+      pageInfo: json['pageInfo'] is Map<String, dynamic>
+          ? ChatPageInfo.fromJson(json['pageInfo'] as Map<String, dynamic>)
+          : ChatPageInfo.fromJson(json),
     );
   }
 

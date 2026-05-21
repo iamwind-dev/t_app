@@ -20,7 +20,7 @@ class UserProfile extends Equatable {
       username: json['username'] as String,
       displayName: json['displayName'] as String? ?? json['username'] as String,
       bio: json['bio'] as String?,
-      avatarUrl: json['avatarUrl'] as String?,
+      avatarUrl: (json['avatarUrl'] ?? json['avatar_url'] ?? json['avatar']) as String?,
       followersCount: json['followersCount'] as int? ?? 0,
       followingCount: json['followingCount'] as int? ?? 0,
       postCount: json['postCount'] as int? ?? 0,

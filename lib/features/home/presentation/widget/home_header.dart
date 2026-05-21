@@ -44,7 +44,7 @@ class HomeHeader extends StatelessWidget {
           curve: Curves.easeInOutCubic,
           height: bottomSpace,
         ),
-        Divider(height: 1, thickness: 1, color: Theme.of(context).dividerColor),
+        // Divider(height: 1, thickness: 1, color: Theme.of(context).dividerColor),
       ],
     );
   }

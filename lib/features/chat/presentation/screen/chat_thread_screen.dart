@@ -249,28 +249,77 @@ class _MoreButton extends StatelessWidget {
   }
 }
 
-class _ConversationBody extends StatelessWidget {
+class _ConversationBody extends StatefulWidget {
   const _ConversationBody({required this.state, required this.onDeleteMessage});
 
   final ChatThreadState state;
   final ValueChanged<ChatMessage> onDeleteMessage;
 
   @override
+  State<_ConversationBody> createState() => _ConversationBodyState();
+}
+
+class _ConversationBodyState extends State<_ConversationBody> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    if (maxScroll - currentScroll <= 100) {
+      context.read<ChatThreadCubit>().loadOlderMessages();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _ConversationBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.state.isLoadingOlder &&
+        !widget.state.isLoadingOlder &&
+        widget.state.messages.length > oldWidget.state.messages.length) {
+      if (_scrollController.hasClients) {
+        final oldMaxScroll = _scrollController.position.maxScrollExtent;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_scrollController.hasClients) return;
+          final newMaxScroll = _scrollController.position.maxScrollExtent;
+          if (newMaxScroll > oldMaxScroll) {
+            final diff = newMaxScroll - oldMaxScroll;
+            _scrollController.jumpTo(_scrollController.offset + diff);
+          }
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (state.status == ChatThreadStatus.loading) {
+    if (widget.state.status == ChatThreadStatus.loading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (state.status == ChatThreadStatus.failure && state.messages.isEmpty) {
+    if (widget.state.status == ChatThreadStatus.failure && widget.state.messages.isEmpty) {
       return Center(
         child: Text(
-          state.errorMessage ?? 'Không thể tải tin nhắn.',
+          widget.state.errorMessage ?? 'Không thể tải tin nhắn.',
           style: ChatThreadTokens.profileMeta(context),
         ),
       );
     }
 
-    if (state.messages.isEmpty) {
+    if (widget.state.messages.isEmpty) {
       return Center(
         child: Text(
           'Chưa có tin nhắn nào.',
@@ -280,43 +329,59 @@ class _ConversationBody extends StatelessWidget {
     }
 
     String? lastMineId;
-    for (final message in state.messages) {
-      if (message.sender.id == state.currentUserId) {
+    for (final message in widget.state.messages) {
+      if (message.sender.id == widget.state.currentUserId) {
         lastMineId = message.id;
         break;
       }
     }
 
+    final showLoadingIndicator = widget.state.hasMoreOlder || widget.state.isLoadingOlder;
+    final totalItemsCount = widget.state.messages.length + (showLoadingIndicator ? 1 : 0);
+
     return Column(
       children: [
         Expanded(
           child: ListView.builder(
+            controller: _scrollController,
             reverse: true,
             padding: const EdgeInsets.only(
               bottom: ChatThreadTokens.bodyBottomGap,
             ),
-            itemCount: state.messages.length,
+            itemCount: totalItemsCount,
             itemBuilder: (context, index) {
-              final message = state.messages[index];
-              final isMine = message.sender.id == state.currentUserId;
+              if (showLoadingIndicator && index == widget.state.messages.length) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
+                    child: widget.state.isLoadingOlder
+                        ? const CircularProgressIndicator()
+                        : const SizedBox.shrink(),
+                  ),
+                );
+              }
+
+              final message = widget.state.messages[index];
+              final isMine = message.sender.id == widget.state.currentUserId;
               return Padding(
                 padding: const EdgeInsets.only(top: 12),
                 child: isMine
                     ? _OutgoingMessage(
                         message: message,
                         showStatus: message.id == lastMineId,
-                        onLongPress: () => onDeleteMessage(message),
+                        onLongPress: () => widget.onDeleteMessage(message),
                       )
                     : _IncomingMessage(message: message),
               );
             },
           ),
         ),
-        _TypingIndicator(typingUsers: state.typingUsers),
+        _TypingIndicator(typingUsers: widget.state.typingUsers),
       ],
     );
   }
 }
+
 
 class _IncomingMessage extends StatelessWidget {
   const _IncomingMessage({required this.message});

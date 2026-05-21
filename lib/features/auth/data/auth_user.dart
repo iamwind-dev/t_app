@@ -15,7 +15,7 @@ class AuthUser extends Equatable {
       email: json['email'] as String? ?? '',
       username: json['username'] as String,
       displayName: json['displayName'] as String? ?? json['username'] as String,
-      avatarUrl: json['avatarUrl'] as String?,
+      avatarUrl: (json['avatarUrl'] ?? json['avatar_url'] ?? json['avatar']) as String?,
     );
   }
 

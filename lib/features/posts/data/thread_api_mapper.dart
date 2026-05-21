@@ -1,3 +1,4 @@
+import 'package:t_app/core/utils/time_formatter.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 import 'package:t_app/features/post_detail/data/models/user.dart';
 
@@ -10,12 +11,18 @@ class ThreadApiMapper {
       id: id,
       rootThreadId: id,
       author: _authorFromJson(json['author']),
-      createdAt: _formatCreatedAt(json['createdAt'] as String?),
+      createdAt: TimeFormatter.formatSocialTime(json['createdAt']),
       content: json['content'] as String? ?? '',
       imageUrls: _stringList(json['mediaUrls']),
       likesCount: json['likeCount'] as int? ?? 0,
       replyCount: json['replyCount'] as int? ?? 0,
       isLikedByMe: json['isLikedByMe'] as bool? ?? false,
+      moderationStatus: json['moderationStatus'] as String? ?? 'approved',
+      moderationLabel: json['moderationLabel'] as String? ?? 'clean',
+      moderationConfidence: _readDouble(json['moderationConfidence']),
+      moderationAction: json['moderationAction'] as String? ?? 'ALLOW',
+      moderationIsWarning: json['moderationIsWarning'] as bool? ?? false,
+      visibilityLevel: json['visibilityLevel'] as String? ?? 'normal',
     );
   }
 
@@ -28,12 +35,18 @@ class ThreadApiMapper {
       parentId: json['parentReplyId'] as String?,
       rootThreadId: postId,
       author: _authorFromJson(json['author']),
-      createdAt: _formatCreatedAt(json['createdAt'] as String?),
+      createdAt: TimeFormatter.formatSocialTime(json['createdAt']),
       content: json['content'] as String? ?? '',
       imageUrls: _stringList(json['mediaUrls']),
       likesCount: json['likeCount'] as int? ?? 0,
       replyCount: json['childReplyCount'] as int? ?? 0,
       isLikedByMe: json['isLikedByMe'] as bool? ?? false,
+      moderationStatus: json['moderationStatus'] as String? ?? 'approved',
+      moderationLabel: json['moderationLabel'] as String? ?? 'clean',
+      moderationConfidence: _readDouble(json['moderationConfidence']),
+      moderationAction: json['moderationAction'] as String? ?? 'ALLOW',
+      moderationIsWarning: json['moderationIsWarning'] as bool? ?? false,
+      visibilityLevel: json['visibilityLevel'] as String? ?? 'normal',
     );
   }
 
@@ -47,7 +60,7 @@ class ThreadApiMapper {
       id: json['id'] as String? ?? '',
       name: json['displayName'] as String? ?? username,
       username: username,
-      avatarUrl: json['avatarUrl'] as String?,
+      avatarUrl: (json['avatarUrl'] ?? json['avatar_url'] ?? json['avatar']) as String?,
     );
   }
 
@@ -59,16 +72,12 @@ class ThreadApiMapper {
     return value.whereType<String>().toList(growable: false);
   }
 
-  static String _formatCreatedAt(String? value) {
-    if (value == null || value.isEmpty) {
-      return '';
+  /// Reads moderation confidence values from numeric JSON safely.
+  static double _readDouble(Object? value) {
+    if (value is num) {
+      return value.toDouble();
     }
 
-    final parsed = DateTime.tryParse(value)?.toLocal();
-    if (parsed == null) {
-      return value;
-    }
-
-    return '${parsed.day}/${parsed.month}/${parsed.year}';
+    return 0;
   }
 }
