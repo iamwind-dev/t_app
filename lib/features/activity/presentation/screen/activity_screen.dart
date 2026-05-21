@@ -109,7 +109,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Khong the mo noi dung nay.')),
+        const SnackBar(content: Text('Không thể mở nội dung này.')),
       );
     }
   }
@@ -159,15 +159,18 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
               if (state.status == ActivityStatus.failure) {
                 return _ActivityMessage(
-                  message:
+                    message:
                       state.errorMessage ??
                       'Chưa có hoạt động nào. Hãy thử làm mới trang hoặc quay lại sau nhé.',
+
                 );
               }
 
               if (items.isEmpty) {
                 return const _ActivityMessage(
+
                   message: 'Chưa có hoạt động nào. Hãy thử làm mới trang hoặc quay lại sau nhé.',
+
                 );
               }
 
@@ -278,7 +281,7 @@ class ActivityHeader extends StatelessWidget {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Da doc het'),
+                      : const Text('Đã đọc hết'),
                 ),
             ],
           ),
@@ -620,7 +623,7 @@ class _FollowButton extends StatelessWidget {
           ),
         ),
         child: Text(
-          isFollowed ? 'Äang theo dÃµi' : 'Theo dÃµi',
+          isFollowed ? 'Đang theo dõi' : 'Theo dõi',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w700,
             color: isFollowed ? colorScheme.onSurface : Colors.black,

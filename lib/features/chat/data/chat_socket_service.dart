@@ -27,6 +27,12 @@ abstract interface class ChatSocketService {
 
   Future<void> leaveConversation(String conversationId);
 
+  Future<void> joinRoom(String room);
+
+  Future<void> leaveRoom(String room);
+
+  Future<void> syncEvents({List<String> rooms = const []});
+
   Future<void> typingStart(String conversationId);
 
   Future<void> typingStop(String conversationId);

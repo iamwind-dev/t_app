@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:t_app/core/network/backend_url_normalizer.dart';
 
 class AuthUser extends Equatable {
   const AuthUser({
@@ -10,12 +11,17 @@ class AuthUser extends Equatable {
   });
 
   factory AuthUser.fromJson(Map<String, dynamic> json) {
+    final rawAvatarUrl =
+        json['avatarUrl'] ?? json['avatar_url'] ?? json['avatar'];
+
     return AuthUser(
       id: json['id'] as String,
       email: json['email'] as String? ?? '',
       username: json['username'] as String,
       displayName: json['displayName'] as String? ?? json['username'] as String,
-      avatarUrl: (json['avatarUrl'] ?? json['avatar_url'] ?? json['avatar']) as String?,
+      avatarUrl: BackendUrlNormalizer.normalizeNullable(
+        rawAvatarUrl as String?,
+      ),
     );
   }
 

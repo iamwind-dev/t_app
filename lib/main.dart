@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -11,11 +15,13 @@ import 'package:t_app/features/reels/presentation/cubits/reels_cubit.dart';
 import 'core/config/app_config.dart';
 import 'core/network/api_client.dart';
 import 'core/network/api_token_store.dart';
+import 'core/notifications/fcm_token_service.dart';
 import 'core/network/secure_api_token_store.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/system_ui_helper.dart';
 import 'core/theme/theme_mode_cubit.dart';
 import 'core/theme/theme_mode_storage.dart';
+import 'features/activity/data/device_tokens_repository.dart';
 import 'features/activity/data/notifications_repository.dart';
 import 'features/activity/domain/notifications_activity_repository.dart';
 import 'features/auth/data/auth_repository.dart';
@@ -36,8 +42,16 @@ import 'features/uploads/domain/uploads_image_repository.dart';
 import 'features/users/data/users_repository.dart';
 import 'features/users/domain/users_profile_repository.dart';
 
+import 'firebase_options.dart';
+
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   final themeModeStorage = ThemeModeStorage();
   final initialThemeMode = await themeModeStorage.load();
   const tokenStore = SecureApiTokenStore();
@@ -53,6 +67,11 @@ Future<void> main() async {
   final postsRepository = PostsRepository(apiClient: apiClient);
   final uploadsRepository = UploadsRepository(apiClient: apiClient);
   final notificationsRepository = NotificationsRepository(apiClient: apiClient);
+  final deviceTokensRepository = DeviceTokensRepository(apiClient: apiClient);
+  final fcmTokenService = FcmTokenService(
+    deviceTokensRepository: deviceTokensRepository,
+  );
+  await fcmTokenService.initialize();
   final chatSocketService = SocketIoChatRealtimeClient(
     baseUrl: AppConfig.apiBaseUrl,
     tokenStore: tokenStore,
@@ -76,6 +95,7 @@ Future<void> main() async {
       postsRepository: postsRepository,
       uploadsRepository: uploadsRepository,
       notificationsRepository: notificationsRepository,
+      fcmTokenService: fcmTokenService,
       chatRepository: chatRepository,
       chatSocketService: chatSocketService,
       reelsRepository: reelsRepository,
@@ -94,6 +114,7 @@ class TogetherApp extends StatelessWidget {
     required this.postsRepository,
     required this.uploadsRepository,
     required this.notificationsRepository,
+    required this.fcmTokenService,
     required this.chatRepository,
     required this.chatSocketService,
     required this.reelsRepository,
@@ -107,6 +128,7 @@ class TogetherApp extends StatelessWidget {
   final PostsFeedRepository postsRepository;
   final UploadsImageRepository uploadsRepository;
   final NotificationsActivityRepository notificationsRepository;
+  final FcmTokenService fcmTokenService;
   final ChatRepository chatRepository;
   final ChatSocketService chatSocketService;
   final ReelsRepository reelsRepository;
@@ -127,6 +149,7 @@ class TogetherApp extends StatelessWidget {
         RepositoryProvider<NotificationsActivityRepository>.value(
           value: notificationsRepository,
         ),
+        RepositoryProvider<FcmTokenService>.value(value: fcmTokenService),
         RepositoryProvider<ChatRepository>.value(value: chatRepository),
         RepositoryProvider<ChatSocketService>.value(value: chatSocketService),
         RepositoryProvider<ReelsRepository>.value(value: reelsRepository),
@@ -179,16 +202,31 @@ class _AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AuthCubit, AuthState>(
-      builder: (context, state) {
-        return switch (state.status) {
-          AuthStatus.checking => const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+    return BlocListener<AuthCubit, AuthState>(
+      listenWhen: (previous, current) =>
+          previous.status != current.status &&
+          current.status == AuthStatus.authenticated,
+      listener: (context, state) {
+        unawaited(context.read<FcmTokenService>().syncTokenForAuthenticatedUser());
+        unawaited(context.read<ChatSocketService>().connect());
+        unawaited(context.read<ChatSocketService>().joinRoom('feed:global'));
+        unawaited(
+          context.read<ChatSocketService>().syncEvents(
+            rooms: const ['feed:global'],
           ),
-          AuthStatus.authenticated => const HomeScreen(),
-          _ => const LoginScreen(),
-        };
+        );
       },
+      child: BlocBuilder<AuthCubit, AuthState>(
+        builder: (context, state) {
+          return switch (state.status) {
+            AuthStatus.checking => const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
+            AuthStatus.authenticated => const HomeScreen(),
+            _ => const LoginScreen(),
+          };
+        },
+      ),
     );
   }
 }

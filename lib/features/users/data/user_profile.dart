@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:t_app/core/network/backend_url_normalizer.dart';
 
 class UserProfile extends Equatable {
   const UserProfile({
@@ -15,12 +16,17 @@ class UserProfile extends Equatable {
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
+    final rawAvatarUrl =
+        json['avatarUrl'] ?? json['avatar_url'] ?? json['avatar'];
+
     return UserProfile(
       id: json['id'] as String,
       username: json['username'] as String,
       displayName: json['displayName'] as String? ?? json['username'] as String,
       bio: json['bio'] as String?,
-      avatarUrl: (json['avatarUrl'] ?? json['avatar_url'] ?? json['avatar']) as String?,
+      avatarUrl: BackendUrlNormalizer.normalizeNullable(
+        rawAvatarUrl as String?,
+      ),
       followersCount: json['followersCount'] as int? ?? 0,
       followingCount: json['followingCount'] as int? ?? 0,
       postCount: json['postCount'] as int? ?? 0,
@@ -68,17 +74,17 @@ class UserProfile extends Equatable {
 
   @override
   List<Object?> get props => [
-    id,
-    username,
-    displayName,
-    bio,
-    avatarUrl,
-    followersCount,
-    followingCount,
-    postCount,
-    isFollowing,
-    tags,
-  ];
+        id,
+        username,
+        displayName,
+        bio,
+        avatarUrl,
+        followersCount,
+        followingCount,
+        postCount,
+        isFollowing,
+        tags,
+      ];
 
   static List<String> _readTags(Object? value) {
     if (value is! List) {

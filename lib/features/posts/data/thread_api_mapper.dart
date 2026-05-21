@@ -1,6 +1,7 @@
 import 'package:t_app/core/utils/time_formatter.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 import 'package:t_app/features/post_detail/data/models/user.dart';
+import 'package:t_app/core/network/backend_url_normalizer.dart';
 
 class ThreadApiMapper {
   const ThreadApiMapper._();
@@ -54,13 +55,18 @@ class ThreadApiMapper {
     final json = value is Map<String, dynamic>
         ? value
         : const <String, dynamic>{};
+
     final username = json['username'] as String? ?? '';
+    final rawAvatarUrl =
+        json['avatarUrl'] ?? json['avatar_url'] ?? json['avatar'];
 
     return User(
       id: json['id'] as String? ?? '',
       name: json['displayName'] as String? ?? username,
       username: username,
-      avatarUrl: (json['avatarUrl'] ?? json['avatar_url'] ?? json['avatar']) as String?,
+      avatarUrl: BackendUrlNormalizer.normalizeNullable(
+        rawAvatarUrl as String?,
+      ),
     );
   }
 
@@ -69,7 +75,10 @@ class ThreadApiMapper {
       return const [];
     }
 
-    return value.whereType<String>().toList(growable: false);
+    return value
+        .whereType<String>()
+        .map(BackendUrlNormalizer.normalize)
+        .toList(growable: false);
   }
 
   /// Reads moderation confidence values from numeric JSON safely.

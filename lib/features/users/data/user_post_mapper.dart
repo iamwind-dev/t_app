@@ -1,6 +1,7 @@
 import 'package:t_app/core/utils/time_formatter.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 import 'package:t_app/features/post_detail/data/models/user.dart';
+import 'package:t_app/core/network/backend_url_normalizer.dart';
 
 class UserPostMapper {
   const UserPostMapper._();
@@ -36,7 +37,9 @@ class UserPostMapper {
       id: json['id'] as String? ?? '',
       name: json['displayName'] as String? ?? username,
       username: username,
-      avatarUrl: json['avatarUrl'] as String?,
+      avatarUrl: BackendUrlNormalizer.normalizeNullable(
+        json['avatarUrl'] as String?,
+      ),
     );
   }
 
