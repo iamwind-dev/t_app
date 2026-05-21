@@ -10,6 +10,7 @@ import 'package:t_app/features/post_detail/data/thread_tree_updater.dart';
 import 'package:t_app/features/post_detail/presentation/widget/thread_item_widget.dart';
 import 'package:t_app/features/post_detail/presentation/widget/thread_replies_section.dart';
 import 'package:t_app/features/posts/domain/posts_feed_repository.dart';
+import 'package:t_app/features/posts/data/moderated_thread_submission.dart';
 
 import 'thread_reply_screen.dart';
 
@@ -28,6 +29,12 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   final Set<String> _expandedThreadIds = <String>{};
   bool _isLoading = false;
 
+  // Pagination variables
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  String? _nextCursor;
+  final ScrollController _scrollController = ScrollController();
+
   User get _currentUser {
     final authUser = context.read<AuthCubit>().state.user;
     return User(
@@ -43,7 +50,23 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
     super.initState();
     _rootThread = widget.rootThread;
     _postsRepository = context.read<PostsFeedRepository>();
+    _scrollController.addListener(_onScroll);
     _loadThread();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    if (maxScroll - currentScroll <= 300) {
+      _loadMoreReplies();
+    }
   }
 
   Future<void> _loadThread() async {
@@ -59,6 +82,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
       final post = await _postsRepository.getPost(widget.rootThread.id);
       final replies = await _postsRepository.getPostReplies(
         widget.rootThread.id,
+        limit: 10,
       );
       if (!mounted) {
         return;
@@ -66,6 +90,8 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
 
       setState(() {
         _rootThread = post.copyWith(children: replies.items);
+        _nextCursor = replies.pageInfo.nextCursor;
+        _hasMore = replies.pageInfo.hasNextPage;
         _isLoading = false;
       });
     } catch (_) {
@@ -74,6 +100,49 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
       }
       setState(() {
         _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadMoreReplies() async {
+    if (_isLoading || _isLoadingMore || !_hasMore || AppConfig.uiPreviewMode) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final replies = await _postsRepository.getPostReplies(
+        widget.rootThread.id,
+        limit: 10,
+        cursor: _nextCursor,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        final existingIds = _rootThread.children.map((c) => c.id).toSet();
+        final newReplies = replies.items
+            .where((item) => !existingIds.contains(item.id))
+            .toList();
+
+        _rootThread = _rootThread.copyWith(
+          children: [..._rootThread.children, ...newReplies],
+        );
+        _nextCursor = replies.pageInfo.nextCursor;
+        _hasMore = replies.pageInfo.hasNextPage;
+        _isLoadingMore = false;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingMore = false;
       });
     }
   }
@@ -141,7 +210,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
       replyContext: ThreadComposerReplyContext.fromThread(targetThread),
       onSubmit: (request) async {
         if (request.primaryContent.isEmpty) {
-          return;
+          return const ModeratedThreadSubmission();
         }
 
         if (AppConfig.uiPreviewMode) {
@@ -156,21 +225,10 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
             content: request.primaryContent,
             imageUrls: request.mediaUrls,
           );
-          if (!mounted) {
-            return;
-          }
-          setState(() {
-            _rootThread = _insertReply(
-              current: _rootThread,
-              targetId: targetThread.id,
-              newReply: newReply,
-            );
-            _expandedThreadIds.add(targetThread.id);
-          });
-          return;
+          return ModeratedThreadSubmission(thread: newReply);
         }
 
-        final newReply = targetThread.id == _rootThread.id
+        return targetThread.id == _rootThread.id
             ? await _postsRepository.createPostReply(
                 postId: _rootThread.id,
                 content: request.primaryContent,
@@ -181,8 +239,10 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                 content: request.primaryContent,
                 mediaUrls: request.mediaUrls,
               );
-
-        if (!mounted) {
+      },
+      onSubmissionAccepted: (submission) async {
+        final newReply = submission.thread;
+        if (newReply == null || !mounted) {
           return;
         }
 
@@ -192,6 +252,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
             targetId: targetThread.id,
             newReply: newReply,
           );
+          _expandedThreadIds.add(targetThread.id);
         });
       },
     );
@@ -306,6 +367,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
           children: [
             Expanded(
               child: ListView(
+                controller: _scrollController,
                 padding: const EdgeInsets.only(bottom: 24),
                 children: [
                   Padding(
@@ -340,6 +402,13 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                       onExpandReplies: _expandReplies,
                     ),
                   ),
+                  if (_isLoadingMore)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                    ),
                 ],
               ),
             ),

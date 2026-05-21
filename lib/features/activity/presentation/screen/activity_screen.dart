@@ -161,13 +161,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 return _ActivityMessage(
                     message:
                       state.errorMessage ??
-                      'Không thể tải hoạt động.',
+                      'Chưa có hoạt động nào. Hãy thử làm mới trang hoặc quay lại sau nhé.',
+
                 );
               }
 
               if (items.isEmpty) {
                 return const _ActivityMessage(
-                  message: 'Chưa có hoạt động nào.',
+
+                  message: 'Chưa có hoạt động nào. Hãy thử làm mới trang hoặc quay lại sau nhé.',
+
                 );
               }
 

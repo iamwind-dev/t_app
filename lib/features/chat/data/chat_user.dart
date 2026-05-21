@@ -10,12 +10,15 @@ class ChatUser extends Equatable {
   });
 
   factory ChatUser.fromJson(Map<String, dynamic> json) {
+    final rawAvatarUrl =
+        json['avatarUrl'] ?? json['avatar_url'] ?? json['avatar'];
+
     return ChatUser(
       id: json['id'] as String,
       username: json['username'] as String,
       displayName: json['displayName'] as String? ?? json['username'] as String,
       avatarUrl: BackendUrlNormalizer.normalizeNullable(
-        json['avatarUrl'] as String?,
+        rawAvatarUrl as String?,
       ),
     );
   }

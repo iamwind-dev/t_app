@@ -9,7 +9,7 @@ abstract interface class ChatRepository {
 
   Future<ChatConversation> createDirectConversation(String userId);
 
-  Future<MessagePage> getMessages(String conversationId, {String? cursor});
+  Future<MessagePage> getMessages(String conversationId, {int limit = 10, String? cursor});
 
   Future<ChatMessage> sendTextMessage({
     required String conversationId,
