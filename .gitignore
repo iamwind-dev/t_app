@@ -22,6 +22,7 @@ AGENTS.md
 .dart_skills/
 docs/
 test/
+.agents/
 
 # IntelliJ related
 *.iml
