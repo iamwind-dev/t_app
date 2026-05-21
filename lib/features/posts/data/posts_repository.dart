@@ -57,6 +57,7 @@ class PostsRepository implements PostsFeedRepository {
       decode: _asMap,
     );
 
+    // `ApiClient` already unwraps the `{ success, data }` envelope for us.
     return ModerationResult.fromJson(response);
   }
 
@@ -233,8 +234,8 @@ class PostsRepository implements PostsFeedRepository {
     String key,
   ) {
     final value = response[key];
-    if (value is Map<String, dynamic>) {
-      return value;
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
     }
 
     throw FormatException('Response missing $key.');
@@ -246,8 +247,8 @@ class PostsRepository implements PostsFeedRepository {
     String key,
   ) {
     final value = response[key];
-    if (value is Map<String, dynamic>) {
-      return value;
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
     }
 
     return null;

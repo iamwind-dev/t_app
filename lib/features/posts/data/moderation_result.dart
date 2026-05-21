@@ -16,15 +16,15 @@ class ModerationLayerResult extends Equatable {
   /// Parses one backend moderation layer and falls back safely on partial data.
   factory ModerationLayerResult.fromJson(Map<String, dynamic> json) {
     return ModerationLayerResult(
-      layer: json['layer'] as String? ?? '',
-      task: json['task'] as String? ?? '',
-      model: json['model'] as String? ?? '',
-      inputText: json['input_text'] as String? ?? '',
-      predId: _readInt(json['pred_id']),
-      label: json['label'] as String? ?? 'clean',
+      layer: _readString(json['layer']),
+      task: _readString(json['task']),
+      model: _readString(json['model']),
+      inputText: _readString(json['input_text'], fallback: _readString(json['inputText'])),
+      predId: _readInt(json['pred_id'] ?? json['predId']),
+      label: _readString(json['label'], fallback: 'clean'),
       confidence: _readDouble(json['confidence']),
       probabilities: _readProbabilities(json['probabilities']),
-      isWarning: json['is_warning'] as bool? ?? false,
+      isWarning: _readBool(json['is_warning'] ?? json['isWarning']),
     );
   }
 
@@ -82,14 +82,14 @@ class ModerationResult extends Equatable {
   /// Parses the merged moderation result returned by the NestJS wrapper.
   factory ModerationResult.fromJson(Map<String, dynamic> json) {
     return ModerationResult(
-      text: json['text'] as String? ?? '',
-      finalLabel: json['final_label'] as String? ?? 'clean',
-      finalConfidence: _readDouble(json['final_confidence']),
-      isWarning: json['is_warning'] as bool? ?? false,
-      action: json['action'] as String? ?? 'ALLOW',
+      text: _readString(json['text']),
+      finalLabel: _readString(json['final_label'], fallback: _readString(json['finalLabel'], fallback: 'clean')),
+      finalConfidence: _readDouble(json['final_confidence'] ?? json['finalConfidence']),
+      isWarning: _readBool(json['is_warning'] ?? json['isWarning']),
+      action: _readString(json['action'], fallback: 'ALLOW'),
       layers: _readLayers(json['layers']),
-      status: json['status'] as String? ?? 'APPROVED',
-      model: json['model'] as String? ?? '',
+      status: _readString(json['status'], fallback: 'APPROVED'),
+      model: _readString(json['model']),
     );
   }
 
@@ -101,6 +101,15 @@ class ModerationResult extends Equatable {
   final List<ModerationLayerResult> layers;
   final String status;
   final String model;
+
+  /// Flags the backend fallback path so the UI can soften its messaging.
+  bool get isAiUnavailable => status == 'AI_UNAVAILABLE';
+
+  /// Tells the composer whether the backend wants a pre-publish warning.
+  bool get shouldWarnUser => action == 'WARN_USER';
+
+  /// Tells the renderer whether the backend restricted the content.
+  bool get shouldBlockOrReview => action == 'BLOCK_OR_REVIEW';
 
   /// Serializes the moderation result back to the backend snake_case contract.
   Map<String, dynamic> toJson() {
@@ -135,6 +144,10 @@ double _readDouble(Object? value) {
     return value.toDouble();
   }
 
+  if (value is String) {
+    return double.tryParse(value) ?? 0;
+  }
+
   return 0;
 }
 
@@ -144,7 +157,31 @@ int _readInt(Object? value) {
     return value.toInt();
   }
 
+  if (value is String) {
+    return int.tryParse(value) ?? 0;
+  }
+
   return 0;
+}
+
+bool _readBool(Object? value) {
+  if (value is bool) {
+    return value;
+  }
+
+  if (value is String) {
+    return value.toLowerCase() == 'true';
+  }
+
+  return false;
+}
+
+String _readString(Object? value, {String fallback = ''}) {
+  if (value is String) {
+    return value;
+  }
+
+  return fallback;
 }
 
 /// Parses layer probability maps while dropping invalid entries safely.
@@ -172,7 +209,8 @@ List<ModerationLayerResult> _readLayers(Object? value) {
   }
 
   return value
-      .whereType<Map<String, dynamic>>()
+      .whereType<Map>()
+      .map((layer) => Map<String, dynamic>.from(layer))
       .map(ModerationLayerResult.fromJson)
       .toList(growable: false);
 }

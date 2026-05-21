@@ -75,12 +75,9 @@ class ThreadItemModel extends Equatable {
 
   bool get isRootThread => parentId == null;
   bool get hasReplies => replyCount > 0 || children.isNotEmpty;
-  bool get shouldShowWarningChip => shouldBlurModeratedContent(
-    moderationAction: moderationAction,
-    moderationIsWarning: moderationIsWarning,
-    visibilityLevel: visibilityLevel,
-  );
-  bool get shouldCollapseModeratedContent => shouldBlurModeratedContent(
+  bool get shouldShowWarningChip => false;
+  bool get shouldCollapseModeratedContent => false;
+  bool get shouldBlurVisibleContent => shouldBlurModeratedContent(
     moderationAction: moderationAction,
     moderationIsWarning: moderationIsWarning,
     visibilityLevel: visibilityLevel,

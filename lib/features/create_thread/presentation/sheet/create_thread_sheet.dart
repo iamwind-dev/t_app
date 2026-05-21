@@ -8,6 +8,7 @@ import 'package:t_app/features/create_thread/presentation/widget/ai_scanning_tex
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 import 'package:t_app/features/post_detail/data/models/user.dart';
 import 'package:t_app/features/post_detail/presentation/widget/avatar_view.dart';
+import 'package:t_app/features/post_detail/presentation/widget/thread_moderation_ui.dart';
 import 'package:t_app/features/uploads/data/upload_image_result.dart';
 import 'package:t_app/features/uploads/domain/uploads_image_repository.dart';
 import 'package:t_app/features/posts/data/moderated_thread_submission.dart';
@@ -372,33 +373,91 @@ class _ThreadComposerSheetState extends State<ThreadComposerSheet>
           ),
         );
       }
-
-      setState(() {
-        _postState = PostState.postingSuccess;
-      });
-
-      if (submission != null && widget.onSubmissionAccepted != null) {
-        widget.onSubmissionAccepted!(submission);
-      }
-
-      await Future<void>.delayed(const Duration(milliseconds: 1200));
-      if (!mounted) {
+      if (submission == null) {
+        _resetComposerState();
         return;
       }
-      Navigator.of(context).pop();
+
+      await _handleSubmissionResult(submission);
     } catch (_) {
       if (!mounted) {
         return;
       }
-      setState(() {
-        _postState = PostState.idle;
-      });
+      _resetComposerState();
       _showSubmitError(
         _imageAttachments.isNotEmpty
             ? 'Khong the tai anh len luc nay.'
             : 'Khong the dang bai luc nay.',
       );
     }
+  }
+
+  /// Routes the backend moderation decision into the appropriate composer UX.
+  Future<void> _handleSubmissionResult(ModeratedThreadSubmission submission) async {
+    final moderation = submission.moderation;
+    if (moderation?.isAiUnavailable == true) {
+      _showSubmitError('AI moderation unavailable');
+    }
+
+    if (moderation == null ||
+        (moderation.action == 'ALLOW' && moderation.isWarning == false)) {
+      await _acceptSubmission(submission);
+      return;
+    }
+
+    if (moderation.shouldWarnUser ||
+        moderation.isWarning ||
+        moderation.shouldBlockOrReview) {
+      final acceptedByUi = await showModerationWarningDialog(
+        context,
+        moderation,
+      );
+      if (!mounted) {
+        return;
+      }
+
+      if (acceptedByUi) {
+        await _acceptSubmission(submission);
+        return;
+      }
+
+      _resetComposerState();
+      return;
+    }
+
+    await _acceptSubmission(submission);
+  }
+
+  /// Finalizes a submission only after the moderation UX has been resolved.
+  Future<void> _acceptSubmission(ModeratedThreadSubmission submission) async {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _postState = PostState.postingSuccess;
+    });
+
+    if (widget.onSubmissionAccepted != null) {
+      widget.onSubmissionAccepted!(submission);
+    }
+
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pop();
+  }
+
+  /// Restores the composer to editable mode without clearing the draft.
+  void _resetComposerState() {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _postState = PostState.idle;
+    });
   }
 
   @override

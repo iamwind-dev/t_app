@@ -4,8 +4,8 @@ import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 import 'package:t_app/features/users/presentation/widgets/user_avatar_button.dart';
 import 'package:t_app/features/users/presentation/widgets/user_name_button.dart';
 
-import 'blurred_paragraph.dart';
 import 'thread_media_section.dart';
+import 'thread_moderation_ui.dart';
 
 class ThreadItemWidget extends StatelessWidget {
   const ThreadItemWidget({
@@ -84,7 +84,7 @@ class ThreadItemWidget extends StatelessWidget {
                   ),
                   if (thread.imageUrls.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    ThreadMediaSection(imageUrls: thread.imageUrls),
+                    ThreadMediaSectionWrapper(thread: thread),
                   ],
                   const SizedBox(height: 12),
                   ThreadActionsRow(
@@ -186,6 +186,7 @@ class ThreadContentSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final shouldBlur = thread.shouldBlurVisibleContent;
     final textStyle = Theme.of(
       context,
     ).textTheme.bodyMedium?.copyWith(height: 1.5);
@@ -193,32 +194,54 @@ class ThreadContentSection extends StatelessWidget {
         ? (_blurredParagraphIndexesByThreadId[thread.id] ?? const <int>{})
         : const <int>{};
     if (blurIndexes.isEmpty) {
-      return Text(thread.content, style: textStyle);
+      return buildModeratedTextWithTrailingIcon(
+        context: context,
+        content: thread.content,
+        textStyle: textStyle,
+        shouldBlur: shouldBlur,
+        moderationAction: thread.moderationAction,
+        moderationLabel: thread.moderationLabel,
+      );
     }
 
     final paragraphs = thread.content.split('\n\n');
     if (paragraphs.length == 1 && blurIndexes.contains(0)) {
-      return BlurredParagraph(
-        text: thread.content,
-        textStyle: textStyle ?? const TextStyle(height: 1.5),
+      return buildModeratedTextWithTrailingIcon(
+        context: context,
+        content: thread.content,
+        textStyle: textStyle,
+        shouldBlur: shouldBlur,
+        moderationAction: thread.moderationAction,
+        moderationLabel: thread.moderationLabel,
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: List.generate(paragraphs.length, (index) {
-        final paragraph = paragraphs[index];
-        final isBlurred = blurIndexes.contains(index);
-        return Padding(
-          padding: EdgeInsets.only(bottom: index == paragraphs.length - 1 ? 0 : 12),
-          child: isBlurred
-              ? BlurredParagraph(
-                  text: paragraph,
-                  textStyle: textStyle ?? const TextStyle(height: 1.5),
-                )
-              : Text(paragraph, style: textStyle),
-        );
-      }),
+    return Text.rich(
+      buildModeratedTextSpan(
+        context: context,
+        content: paragraphs.join('\n\n'),
+        style: textStyle,
+        shouldBlur: shouldBlur,
+        moderationLabel: thread.moderationLabel,
+        moderationAction: thread.moderationAction,
+      ),
+    );
+  }
+}
+
+class ThreadMediaSectionWrapper extends StatelessWidget {
+  const ThreadMediaSectionWrapper({super.key, required this.thread});
+
+  final ThreadItemModel thread;
+
+  @override
+  Widget build(BuildContext context) {
+    return buildModeratedContent(
+      context: context,
+      shouldBlur: thread.shouldBlurVisibleContent,
+      moderationLabel: thread.moderationLabel,
+      moderationAction: thread.moderationAction,
+      child: ThreadMediaSection(imageUrls: thread.imageUrls),
     );
   }
 }
