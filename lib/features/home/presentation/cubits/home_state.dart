@@ -24,6 +24,7 @@ class HomeState extends Equatable {
     this.currentUser = defaultCurrentUser,
     this.rootThreads = const [],
     this.selectedTabIndex = 0,
+    this.lastLoadedAtEpochMs,
     this.errorMessage,
   });
 
@@ -31,6 +32,7 @@ class HomeState extends Equatable {
   final FeedUser currentUser;
   final List<ThreadItemModel> rootThreads;
   final int selectedTabIndex;
+  final int? lastLoadedAtEpochMs;
   final String? errorMessage;
 
   HomeState copyWith({
@@ -38,6 +40,7 @@ class HomeState extends Equatable {
     FeedUser? currentUser,
     List<ThreadItemModel>? rootThreads,
     int? selectedTabIndex,
+    int? lastLoadedAtEpochMs,
     String? errorMessage,
     bool clearError = false,
   }) {
@@ -46,6 +49,7 @@ class HomeState extends Equatable {
       currentUser: currentUser ?? this.currentUser,
       rootThreads: rootThreads ?? this.rootThreads,
       selectedTabIndex: selectedTabIndex ?? this.selectedTabIndex,
+      lastLoadedAtEpochMs: lastLoadedAtEpochMs ?? this.lastLoadedAtEpochMs,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
     );
   }
@@ -56,6 +60,7 @@ class HomeState extends Equatable {
     currentUser,
     rootThreads,
     selectedTabIndex,
+    lastLoadedAtEpochMs,
     errorMessage,
   ];
 }

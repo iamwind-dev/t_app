@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:t_app/core/config/app_config.dart';
 import 'package:t_app/core/demo/demo_data.dart';
 import 'package:t_app/core/network/api_exception.dart';
+import 'package:t_app/core/realtime/realtime_event_bus.dart';
 import 'package:t_app/features/users/domain/users_profile_repository.dart';
 
 import 'search_users_state.dart';
@@ -9,9 +12,14 @@ import 'search_users_state.dart';
 class SearchUsersCubit extends Cubit<SearchUsersState> {
   SearchUsersCubit({required UsersProfileRepository repository})
     : _repository = repository,
-      super(const SearchUsersState());
+      super(const SearchUsersState()) {
+    _realtimeSubscription = RealtimeEventBus.instance.stream.listen(
+      _handleRealtimeEvent,
+    );
+  }
 
   final UsersProfileRepository _repository;
+  late final StreamSubscription<RealtimeAppEvent> _realtimeSubscription;
 
   Future<void> searchByUsername(String rawUsername) async {
     final username = rawUsername.trim();
@@ -104,5 +112,38 @@ class SearchUsersCubit extends Cubit<SearchUsersState> {
         ),
       );
     }
+  }
+
+  void _handleRealtimeEvent(RealtimeAppEvent event) {
+    if (event.type != 'user.profile.updated') {
+      return;
+    }
+
+    final current = state.result;
+    if (current == null) {
+      return;
+    }
+
+    final userId = event.payload['userId'] as String?;
+    if (userId == null || userId != current.id) {
+      return;
+    }
+
+    emit(
+      state.copyWith(
+        result: current.copyWith(
+          displayName:
+              event.payload['displayName'] as String? ?? current.displayName,
+          username: event.payload['username'] as String? ?? current.username,
+          avatarUrl: event.payload['avatarUrl'] as String? ?? current.avatarUrl,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Future<void> close() async {
+    await _realtimeSubscription.cancel();
+    return super.close();
   }
 }

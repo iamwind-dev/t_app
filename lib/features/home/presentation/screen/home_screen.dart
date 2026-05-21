@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:t_app/features/activity/presentation/screen/activity_screen.dart';
 import 'package:t_app/core/theme/theme_mode_cubit.dart';
 import 'package:t_app/core/widget/home_bottom_tab_bar.dart';
 import 'package:t_app/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:t_app/features/chat/data/chat_socket_service.dart';
 import 'package:t_app/features/chat/presentation/screen/chat_inbox_screen.dart';
 import 'package:t_app/features/create_thread/presentation/sheet/create_thread_sheet.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
@@ -28,7 +31,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static const _toggleThreshold = 8.0;
   static const _barHeight = 78.0;
 
@@ -41,15 +44,32 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _scrollController = ScrollController()..addListener(_handleScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(_bindFeedRealtime());
+      unawaited(context.read<HomeCubit>().syncIfStale());
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController
       ..removeListener(_handleScroll)
       ..dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_bindFeedRealtime());
+      unawaited(_syncOnResume());
+    }
   }
 
   void _handleScroll() {
@@ -92,6 +112,17 @@ class _HomeScreenState extends State<HomeScreen> {
       avatarAssetPath: authUser?.avatarUrl == null
           ? state.currentUser.avatarAsset
           : null,
+    );
+  }
+
+  FeedUser _buildFeedCurrentUser(HomeState state) {
+    final authUser = context.read<AuthCubit>().state.user;
+    final avatarUrl = authUser?.avatarUrl;
+    return FeedUser(
+      username: authUser?.username ?? state.currentUser.username,
+      avatarAsset: (avatarUrl != null && avatarUrl.isNotEmpty)
+          ? avatarUrl
+          : state.currentUser.avatarAsset,
     );
   }
 
@@ -139,6 +170,22 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _refreshHomeFeed() {
+    return context.read<HomeCubit>().loadHomeFeed();
+  }
+
+  Future<void> _bindFeedRealtime() async {
+    final socketService = context.read<ChatSocketService>();
+    await socketService.connect();
+    await socketService.joinRoom('feed:global');
+  }
+
+  Future<void> _syncOnResume() async {
+    final socketService = context.read<ChatSocketService>();
+    await socketService.syncEvents(rooms: const ['feed:global']);
+    await context.read<HomeCubit>().syncIfStale(maxAge: const Duration(minutes: 1));
   }
 
   @override
@@ -194,48 +241,52 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         HomeHeader(isCompact: _isHeaderCompact),
                         Expanded(
-                          child: ListView.separated(
-                            controller: _scrollController,
-                            padding: EdgeInsets.only(
-                              bottom: shouldShowBottomBar
-                                  ? _bottomSpace(context)
-                                  : 12,
-                            ),
-                            itemCount: state.rootThreads.length + 1,
-                            itemBuilder: (context, index) {
-                              if (index == 0) {
-                                return CreatePostCard(
-                                  currentUser: state.currentUser,
-                                  onTap: () => _openCreateThreadSheet(state),
-                                );
-                              }
+                          child: RefreshIndicator(
+                            onRefresh: _refreshHomeFeed,
+                            child: ListView.separated(
+                              controller: _scrollController,
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: EdgeInsets.only(
+                                bottom: shouldShowBottomBar
+                                    ? _bottomSpace(context)
+                                    : 12,
+                              ),
+                              itemCount: state.rootThreads.length + 1,
+                              itemBuilder: (context, index) {
+                                if (index == 0) {
+                                  return CreatePostCard(
+                                    currentUser: _buildFeedCurrentUser(state),
+                                    onTap: () => _openCreateThreadSheet(state),
+                                  );
+                                }
 
-                              final rootThread = state.rootThreads[index - 1];
-                              return Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  0,
-                                  14,
-                                  0,
-                                  16,
-                                ),
-                                child: HomeThreadPreviewBlock(
-                                  rootThread: rootThread,
-                                  onRootTap: () =>
-                                      _openThreadDetail(rootThread),
-                                  onReplyTap: () =>
-                                      _openThreadDetail(rootThread),
-                                  onLikeTap: context
-                                      .read<HomeCubit>()
-                                      .togglePostLike,
-                                  onPreviewReplyTap: (replyThread) =>
-                                      _openThreadBranch(
-                                        rootThread: rootThread,
-                                        selectedThread: replyThread,
-                                      ),
-                                ),
-                              );
-                            },
-                            separatorBuilder: (_, __) => const PostDivider(),
+                                final rootThread = state.rootThreads[index - 1];
+                                return Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    0,
+                                    14,
+                                    0,
+                                    16,
+                                  ),
+                                  child: HomeThreadPreviewBlock(
+                                    rootThread: rootThread,
+                                    onRootTap: () =>
+                                        _openThreadDetail(rootThread),
+                                    onReplyTap: () =>
+                                        _openThreadDetail(rootThread),
+                                    onLikeTap: context
+                                        .read<HomeCubit>()
+                                        .togglePostLike,
+                                    onPreviewReplyTap: (replyThread) =>
+                                        _openThreadBranch(
+                                          rootThread: rootThread,
+                                          selectedThread: replyThread,
+                                        ),
+                                  ),
+                                );
+                              },
+                              separatorBuilder: (_, __) => const PostDivider(),
+                            ),
                           ),
                         ),
                       ],

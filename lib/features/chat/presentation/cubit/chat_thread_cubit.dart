@@ -292,7 +292,7 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
       state.copyWith(
         typingUsers: {
           ...state.typingUsers,
-          event.userId: event.username ?? event.userId,
+          event.userId: _resolveTypingUsername(event),
         },
       ),
     );
@@ -301,6 +301,31 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
       const Duration(seconds: 3),
       () => _removeTypingUser(event.userId),
     );
+  }
+
+  String _resolveTypingUsername(ChatTypingEvent event) {
+    final eventDisplayName = event.username?.trim();
+    if (eventDisplayName != null && eventDisplayName.isNotEmpty) {
+      return eventDisplayName;
+    }
+
+    for (final member in state.conversation.members) {
+      if (member.user.id != event.userId) {
+        continue;
+      }
+
+      final displayName = member.user.displayName.trim();
+      if (displayName.isNotEmpty) {
+        return displayName;
+      }
+
+      final username = member.user.username.trim();
+      if (username.isNotEmpty) {
+        return username;
+      }
+    }
+
+    return event.userId;
   }
 
   void _handleTypingStopped(ChatTypingEvent event) {

@@ -57,16 +57,16 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Xoa tin nhan?'),
-          content: const Text('Tin nhan nay se bi xoa khoi cuoc tro chuyen.'),
+          title: const Text('Xóa tin nhắn?'),
+          content: const Text('Tin nhắn này sẽ bị xóa khỏi cuộc trò chuyện của bạn và người nhận.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Huy'),
+              child: const Text('Hủy'),
             ),
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Xoa'),
+              child: const Text('Xóa'),
             ),
           ],
         );
@@ -168,13 +168,13 @@ class _ConversationHeader extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    user?.username ?? 'Không xác định',
+                    user?.displayName ?? 'Không xác định',
                     style: ChatThreadTokens.headerUsername(context),
                   ),
-                  Text(
-                    user?.displayName ?? '',
-                    style: ChatThreadTokens.headerName(context),
-                  ),
+                  // Text(
+                  //   user?.displayName ?? '',
+                  //   style: ChatThreadTokens.headerName(context),
+                  // ),
                 ],
               ),
             ),

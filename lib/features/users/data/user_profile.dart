@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:t_app/core/network/backend_url_normalizer.dart';
 
 class UserProfile extends Equatable {
   const UserProfile({
@@ -20,7 +21,9 @@ class UserProfile extends Equatable {
       username: json['username'] as String,
       displayName: json['displayName'] as String? ?? json['username'] as String,
       bio: json['bio'] as String?,
-      avatarUrl: json['avatarUrl'] as String?,
+      avatarUrl: BackendUrlNormalizer.normalizeNullable(
+        json['avatarUrl'] as String?,
+      ),
       followersCount: json['followersCount'] as int? ?? 0,
       followingCount: json['followingCount'] as int? ?? 0,
       postCount: json['postCount'] as int? ?? 0,
