@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
+// Temporarily disabled for iOS sideload splash debugging.
+// import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -15,8 +16,8 @@ import 'package:t_app/features/reels/presentation/cubits/reels_cubit.dart';
 import 'core/config/app_config.dart';
 import 'core/network/api_client.dart';
 import 'core/network/api_token_store.dart';
-import 'core/notifications/fcm_token_service.dart';
 import 'core/network/secure_api_token_store.dart';
+import 'core/notifications/fcm_token_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/system_ui_helper.dart';
 import 'core/theme/theme_mode_cubit.dart';
@@ -44,43 +45,94 @@ import 'features/users/domain/users_profile_repository.dart';
 
 import 'firebase_options.dart';
 
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-}
+// Temporarily disabled for iOS sideload splash debugging.
+// Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+//   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+// }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  final themeModeStorage = ThemeModeStorage();
-  final initialThemeMode = await themeModeStorage.load();
+
+  // Render something immediately. If startup fails, the app will show the error
+  // instead of staying forever on the native splash screen.
+  runApp(const BootDebugApp(message: 'Starting app...'));
+
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).timeout(const Duration(seconds: 10));
+  } catch (error) {
+    runApp(
+      BootDebugApp(
+        message: 'Firebase startup error:\n$error',
+      ),
+    );
+    return;
+  }
+
+  // Temporarily disabled for iOS sideload splash debugging.
+  // FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  late final ThemeModeStorage themeModeStorage;
+  late final ThemeMode initialThemeMode;
+
+  try {
+    themeModeStorage = ThemeModeStorage();
+    initialThemeMode = await themeModeStorage.load().timeout(
+      const Duration(seconds: 10),
+    );
+  } catch (error) {
+    runApp(
+      BootDebugApp(
+        message: 'Theme startup error:\n$error',
+      ),
+    );
+    return;
+  }
+
   const tokenStore = SecureApiTokenStore();
+
   final apiClient = ApiClient(
-    dio: Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl)),
+    dio: Dio(
+      BaseOptions(
+        baseUrl: AppConfig.apiBaseUrl.trim(),
+      ),
+    ),
     tokenStore: tokenStore,
   );
+
   final authRepository = AuthRepository(
     apiClient: apiClient,
     tokenStore: tokenStore,
   );
+
   final usersRepository = UsersRepository(apiClient: apiClient);
   final postsRepository = PostsRepository(apiClient: apiClient);
   final uploadsRepository = UploadsRepository(apiClient: apiClient);
   final notificationsRepository = NotificationsRepository(apiClient: apiClient);
   final deviceTokensRepository = DeviceTokensRepository(apiClient: apiClient);
+
   final fcmTokenService = FcmTokenService(
     deviceTokensRepository: deviceTokensRepository,
   );
-  await fcmTokenService.initialize();
+
+  // Temporarily disabled for iOS sideload splash debugging.
+  // This may call APNs/FCM token APIs and can hang/fail on sideloaded iOS builds
+  // if push capabilities/signing are not configured correctly.
+  // await fcmTokenService.initialize();
+
   final chatSocketService = SocketIoChatRealtimeClient(
-    baseUrl: AppConfig.apiBaseUrl,
+    baseUrl: AppConfig.apiBaseUrl.trim(),
     tokenStore: tokenStore,
   );
+
   final chatRepository = BackendChatRepository(
     apiClient: apiClient,
     realtimeClient: chatSocketService,
   );
+
   final reelsLocalDataSource = ReelsLocalDataSourceImpl();
+
   final reelsRepository = ReelsRepositoryImpl(
     localDataSource: reelsLocalDataSource,
   );
@@ -101,6 +153,34 @@ Future<void> main() async {
       reelsRepository: reelsRepository,
     ),
   );
+}
+
+class BootDebugApp extends StatelessWidget {
+  const BootDebugApp({
+    super.key,
+    required this.message,
+  });
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Together',
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class TogetherApp extends StatelessWidget {
@@ -207,7 +287,9 @@ class _AuthGate extends StatelessWidget {
           previous.status != current.status &&
           current.status == AuthStatus.authenticated,
       listener: (context, state) {
-        unawaited(context.read<FcmTokenService>().syncTokenForAuthenticatedUser());
+        // Temporarily disabled for iOS sideload splash/debug testing.
+        // unawaited(context.read<FcmTokenService>().syncTokenForAuthenticatedUser());
+
         unawaited(context.read<ChatSocketService>().connect());
         unawaited(context.read<ChatSocketService>().joinRoom('feed:global'));
         unawaited(
@@ -220,8 +302,8 @@ class _AuthGate extends StatelessWidget {
         builder: (context, state) {
           return switch (state.status) {
             AuthStatus.checking => const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            ),
+                body: Center(child: CircularProgressIndicator()),
+              ),
             AuthStatus.authenticated => const HomeScreen(),
             _ => const LoginScreen(),
           };
