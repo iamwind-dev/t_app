@@ -5,7 +5,6 @@ import 'package:t_app/features/reels/presentation/cubits/reels_state.dart';
 import 'package:t_app/features/reels/presentation/widget/reel_overlay.dart';
 import 'package:t_app/features/reels/presentation/widget/reel_video_player.dart';
 
-
 class ReelsPage extends StatelessWidget {
   const ReelsPage({super.key, required this.bottomPadding});
 
@@ -18,49 +17,62 @@ class ReelsPage extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      body: BlocBuilder<ReelsCubit, ReelsState>(
-        builder: (context, state) {
-          if (state is ReelsLoading || state is ReelsInitial) {
-            return const Center(
-              child: CircularProgressIndicator(color: Colors.white),
-            );
-          }
-
-          if (state is ReelsError) {
-            return Center(
-              child: Text(
-                state.message,
-                style: const TextStyle(color: Colors.white),
-              ),
-            );
-          }
-
-          if (state is ReelsLoaded) {
-            return PageView.builder(
-              scrollDirection: Axis.vertical,
-              itemCount: state.reels.length,
-              itemBuilder: (context, index) {
-                final reel = state.reels[index];
-
-                return Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    ReelVideoPlayer(videoUrl: reel.videoUrl),
-                    ReelOverlay(
-                      reel: reel,
-                      bottomInset: overlayBottomInset,
-                      onLike: () {
-                        context.read<ReelsCubit>().toggleLike(reel.id);
-                      },
-                    ),
-                  ],
+      body: Stack(
+        children: [
+          BlocBuilder<ReelsCubit, ReelsState>(
+            builder: (context, state) {
+              if (state is ReelsLoading || state is ReelsInitial) {
+                return const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
                 );
-              },
-            );
-          }
+              }
 
-          return const SizedBox.shrink();
-        },
+              if (state is ReelsError) {
+                return Center(
+                  child: Text(
+                    state.message,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                );
+              }
+
+              if (state is ReelsLoaded) {
+                if (state.reels.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No reels yet',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  );
+                }
+
+                return PageView.builder(
+                  scrollDirection: Axis.vertical,
+                  itemCount: state.reels.length,
+                  itemBuilder: (context, index) {
+                    final reel = state.reels[index];
+
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        ReelVideoPlayer(videoUrl: reel.videoUrl),
+                        ReelOverlay(
+                          reel: reel,
+                          bottomInset: overlayBottomInset,
+                          onLike: () {
+                            context.read<ReelsCubit>().toggleLike(reel.id);
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                );
+              }
+
+              return const SizedBox.shrink();
+            },
+          ),
+        ],
       ),
     );
   }

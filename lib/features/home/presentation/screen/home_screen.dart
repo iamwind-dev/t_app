@@ -15,6 +15,7 @@ import 'package:t_app/features/post_detail/presentation/screen/thread_detail_scr
 import 'package:t_app/features/post_detail/presentation/screen/thread_reply_screen.dart';
 import 'package:t_app/features/profile/presentation/screen/profile_screen.dart';
 import 'package:t_app/features/reels/presentation/pages/reels_page.dart';
+import 'package:t_app/features/reels/presentation/sheet/create_reel_sheet.dart';
 import 'package:t_app/features/search/presentation/screen/search_screen.dart';
 import 'package:t_app/features/search/presentation/theme/search_tokens.dart';
 
@@ -166,6 +167,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   void _handleBottomTabTap(int index, HomeState state) {
     context.read<HomeCubit>().changeTab(index);
+  }
+
+  void _openCreateReelSheet() {
+    showCreateReelSheet(context);
   }
 
   void _openThreadDetail(ThreadItemModel rootThread) {
@@ -419,6 +424,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             selectedIndex: state.selectedTabIndex,
                             onTap: (index) =>
                                 _handleBottomTabTap(index, state),
+                            onReelsCreateTap: _openCreateReelSheet,
                           ),
                         ),
                       ),

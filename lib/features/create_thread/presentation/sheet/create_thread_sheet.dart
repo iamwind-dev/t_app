@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:t_app/features/reels/presentation/sheet/create_reel_sheet.dart';
 import 'package:t_app/features/create_thread/data/models/thread_draft.dart';
 import 'package:t_app/features/create_thread/presentation/widget/ai_scanning_text.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
@@ -319,6 +320,14 @@ class _ThreadComposerSheetState extends State<ThreadComposerSheet>
     });
   }
 
+  void _openCreateReelFlow() {
+    final rootContext = Navigator.of(context, rootNavigator: true).context;
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      showCreateReelSheet(rootContext);
+    });
+  }
+
   /// Uploads staged media first, then delegates the final post or reply submit.
   Future<void> _submit() async {
     if (_postState != PostState.idle) {
@@ -501,6 +510,7 @@ class _ThreadComposerSheetState extends State<ThreadComposerSheet>
                     imageAttachments: _imageAttachments,
                     onPickImages: _pickImages,
                     onRemoveImageAttachment: _removeImageAttachmentAt,
+                    onPickVideo: _openCreateReelFlow,
                     postState: _postState,
                     scanController: _scanController,
                     mode: widget.mode,
@@ -601,6 +611,7 @@ class _ThreadDraftComposer extends StatelessWidget {
     required this.imageAttachments,
     required this.onPickImages,
     required this.onRemoveImageAttachment,
+    required this.onPickVideo,
     required this.postState,
     required this.scanController,
     required this.mode,
@@ -616,6 +627,7 @@ class _ThreadDraftComposer extends StatelessWidget {
   final List<_ComposerImageAttachment> imageAttachments;
   final Future<void> Function() onPickImages;
   final void Function(int index) onRemoveImageAttachment;
+  final VoidCallback onPickVideo;
   final PostState postState;
   final AnimationController scanController;
   final ComposerMode mode;
@@ -641,6 +653,7 @@ class _ThreadDraftComposer extends StatelessWidget {
             onAddToThread: onAddToThread,
             imageAttachments: imageAttachments,
             onPickImages: onPickImages,
+            onPickVideo: onPickVideo,
             onRemoveImageAttachment: onRemoveImageAttachment,
             postState: postState,
             scanController: scanController,
@@ -737,6 +750,7 @@ class _ThreadDraftItemComposer extends StatelessWidget {
     required this.onAddToThread,
     required this.imageAttachments,
     required this.onPickImages,
+    required this.onPickVideo,
     required this.onRemoveImageAttachment,
     required this.postState,
     required this.scanController,
@@ -752,6 +766,7 @@ class _ThreadDraftItemComposer extends StatelessWidget {
   final VoidCallback onAddToThread;
   final List<_ComposerImageAttachment> imageAttachments;
   final Future<void> Function() onPickImages;
+  final VoidCallback onPickVideo;
   final void Function(int index) onRemoveImageAttachment;
   final PostState postState;
   final AnimationController scanController;
@@ -846,7 +861,10 @@ class _ThreadDraftItemComposer extends StatelessWidget {
                         ),
                 ),
                 const SizedBox(height: 12),
-                ComposerToolbar(onPickImages: onPickImages),
+                ComposerToolbar(
+                  onPickImages: onPickImages,
+                  onPickVideo: onPickVideo,
+                ),
                 if (showMediaComposer && imageAttachments.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   _ComposerImageStrip(
@@ -871,10 +889,15 @@ class _ThreadDraftItemComposer extends StatelessWidget {
 }
 
 class ComposerToolbar extends StatelessWidget {
-  const ComposerToolbar({super.key, required this.onPickImages});
+  const ComposerToolbar({
+    super.key,
+    required this.onPickImages,
+    required this.onPickVideo,
+  });
 
   static const _icons = [
     Icons.image_outlined,
+    Icons.video_library_outlined,
     Icons.gif_box_outlined,
     Icons.subject_rounded,
     Icons.format_quote_rounded,
@@ -882,6 +905,7 @@ class ComposerToolbar extends StatelessWidget {
   ];
 
   final Future<void> Function() onPickImages;
+  final VoidCallback onPickVideo;
 
   @override
   Widget build(BuildContext context) {
@@ -890,7 +914,11 @@ class ComposerToolbar extends StatelessWidget {
     return Row(
       children: List.generate(_icons.length, (index) {
         return GestureDetector(
-          onTap: index == 0 ? () => onPickImages() : null,
+          onTap: switch (index) {
+            0 => () => onPickImages(),
+            1 => onPickVideo,
+            _ => null,
+          },
           behavior: HitTestBehavior.opaque,
           child: Padding(
             padding: EdgeInsets.only(

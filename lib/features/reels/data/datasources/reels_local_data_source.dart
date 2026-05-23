@@ -14,8 +14,10 @@ class ReelsLocalDataSourceImpl implements ReelsLocalDataSource {
         id: '1',
         videoUrl:
             'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
+        authorId: 'user_1',
         username: 'hiep.nguyen',
-        caption: 'Một ngày chill nhẹ với Flutter Reels UI #flutter #reels',
+        displayName: 'Hiep Nguyen',
+        caption: 'A small local demo reel.',
         music: 'Original audio - hiep.nguyen',
         avatarUrl: 'https://i.pravatar.cc/150?img=3',
         likes: 12500,
@@ -26,8 +28,10 @@ class ReelsLocalDataSourceImpl implements ReelsLocalDataSource {
         id: '2',
         videoUrl:
             'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4',
+        authorId: 'user_2',
         username: 'flutter.dev',
-        caption: 'Clean Architecture nhưng UI vẫn mượt như Instagram',
+        displayName: 'Flutter',
+        caption: 'Another local demo reel.',
         music: 'Trending sound',
         avatarUrl: 'https://i.pravatar.cc/150?img=5',
         likes: 8930,
