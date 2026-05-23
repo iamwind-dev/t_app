@@ -6,7 +6,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:t_app/features/reels/data/datasources/reels_local_data_source.dart';
 import 'package:t_app/features/reels/data/repositories_impl/reels_repository_impl.dart';
 import 'package:t_app/features/reels/domain/repositories/reels_repository.dart';
 import 'package:t_app/features/reels/domain/usecases/get_reels.dart';
@@ -80,10 +79,7 @@ Future<void> main() async {
     apiClient: apiClient,
     realtimeClient: chatSocketService,
   );
-  final reelsLocalDataSource = ReelsLocalDataSourceImpl();
-  final reelsRepository = ReelsRepositoryImpl(
-    localDataSource: reelsLocalDataSource,
-  );
+  final reelsRepository = ReelsRepositoryImpl(apiClient: apiClient);
 
   runApp(
     TogetherApp(
@@ -172,7 +168,10 @@ class TogetherApp extends StatelessWidget {
           ),
           BlocProvider(
             create: (_) =>
-                ReelsCubit(getReels: GetReels(reelsRepository))..loadReels(),
+                ReelsCubit(
+                  getReels: GetReels(reelsRepository),
+                  repository: reelsRepository,
+                )..loadReels(),
           ),
         ],
         child: BlocBuilder<ThemeModeCubit, ThemeMode>(
