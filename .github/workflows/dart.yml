@@ -10,34 +10,54 @@ jobs:
   build-ios:
     name: 🎉 iOS Build
     runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v3
 
-      - uses: subosito/flutter-action@v2
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           architecture: x64
-      - run: flutter pub get
-      - run: dart run intl_utils:generate
-      - run: dart run build_runner build --delete-conflicting-outputs
-      
 
-      - run: pod repo update
+      - name: Disable Flutter Swift Package Manager
+        run: flutter config --no-enable-swift-package-manager
+
+      - name: Clean Flutter
+        run: flutter clean
+
+      - name: Get Flutter packages
+        run: flutter pub get
+
+      - name: Generate intl files
+        run: dart run intl_utils:generate
+
+      - name: Run build_runner
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Install CocoaPods dependencies
+        run: |
+          pod repo update
+          pod install
         working-directory: ios
 
-      - run: flutter build ios --release --no-codesign
+      - name: Build iOS without codesign
+        run: flutter build ios --release --no-codesign
 
-      - run: mkdir Payload
+      - name: Create Payload folder
+        run: mkdir -p Payload
         working-directory: build/ios/iphoneos
 
-      - run: mv Runner.app/ Payload
+      - name: Move Runner.app to Payload
+        run: mv Runner.app Payload/
         working-directory: build/ios/iphoneos
 
-      - name: Zip output
+      - name: Zip IPA
         run: zip -qq -r -9 FlutterIpaExport.ipa Payload
         working-directory: build/ios/iphoneos
 
-      - name: Upload binaries to release
+      - name: Upload IPA to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
