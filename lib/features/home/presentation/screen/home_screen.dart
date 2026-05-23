@@ -3,8 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:t_app/features/activity/presentation/screen/activity_screen.dart';
-import 'package:t_app/core/utils/platform_info_service.dart';
-import 'package:t_app/core/widget/adaptive_bottom_nav_bar.dart';
+import 'package:t_app/core/widget/home_bottom_tab_bar.dart';
 import 'package:t_app/features/auth/data/auth_user.dart';
 import 'package:t_app/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:t_app/features/chat/data/chat_socket_service.dart';
@@ -44,7 +43,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _isHeaderCompact = false;
   double _lastOffset = 0;
   double _headerStretchOffset = 0;
-  bool _useNativeLiquidGlassBottomBar = false;
 
   @override
   void initState() {
@@ -52,7 +50,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
 
     _scrollController = ScrollController()..addListener(_handleScroll);
-    unawaited(_resolveBottomNavStyle());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -114,15 +111,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   double _bottomSpace(BuildContext context) {
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-    if (_useNativeLiquidGlassBottomBar) {
-      return AdaptiveBottomNavBar.iosGlassHeight +
-          AdaptiveBottomNavBar.iosGlassBottomMargin +
-          bottomInset +
-          28;
-    }
-
-    return _barHeight + bottomInset + 12;
+    return _barHeight + MediaQuery.paddingOf(context).bottom + 12;
   }
 
   bool _handleHomeScrollNotification(ScrollNotification notification) {
@@ -271,18 +260,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await socketService.joinRoom('feed:global');
   }
 
-  Future<void> _resolveBottomNavStyle() async {
-    final useNativeLiquidGlass =
-        await PlatformInfoService.supportsNativeLiquidGlassBottomNav();
-    if (!mounted || useNativeLiquidGlass == _useNativeLiquidGlassBottomBar) {
-      return;
-    }
-
-    setState(() {
-      _useNativeLiquidGlassBottomBar = useNativeLiquidGlass;
-    });
-  }
-
   Future<void> _syncOnResume() async {
     final socketService = context.read<ChatSocketService>();
     final homeCubit = context.read<HomeCubit>();
@@ -327,7 +304,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               _isBottomBarVisible;
 
           return Scaffold(
-            extendBody: _useNativeLiquidGlassBottomBar,
             body: SafeArea(
               bottom: false,
               child: Stack(
@@ -465,10 +441,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         opacity: shouldShowBottomBar ? 1 : 0,
                         child: IgnorePointer(
                           ignoring: !shouldShowBottomBar,
-                          child: AdaptiveBottomNavBar(
+                          child: HomeBottomTabBar(
                             selectedIndex: state.selectedTabIndex,
-                            useNativeLiquidGlass:
-                                _useNativeLiquidGlassBottomBar,
                             onTap: (index) =>
                                 _handleBottomTabTap(index, state),
                             onReelsCreateTap: _openCreateReelSheet,
