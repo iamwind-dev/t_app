@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../auth/data/auth_session.dart';
 import '../../domain/entities/register_user.dart';
 import '../../domain/usecases/register_user.dart';
 
@@ -20,6 +21,7 @@ class RegisterController extends ChangeNotifier {
 
   bool hidePassword = true;
   bool isLoading = false;
+  String? errorMessage;
 
   void togglePassword() {
     hidePassword = !hidePassword;
@@ -36,32 +38,38 @@ class RegisterController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> register() async {
+  Future<AuthSession?> register() async {
     final isValid = formKey.currentState?.validate() ?? false;
 
-    if (!isValid || gender == null || birthday == null) {
+    if (!isValid) {
+      errorMessage = 'Vui lòng nhập đầy đủ thông tin.';
       notifyListeners();
-      return false;
+      return null;
     }
 
     isLoading = true;
+    errorMessage = null;
     notifyListeners();
 
     final user = RegisterUserEntity(
       fullName: fullNameController.text.trim(),
       username: usernameController.text.trim(),
-      gender: gender!,
-      birthday: birthday!,
+      gender: gender ?? 'unspecified',
+      birthday: birthday ?? DateTime(1970, 1, 1),
       email: emailController.text.trim(),
       password: passwordController.text,
     );
 
-    final result = await registerUser(user);
-
-    isLoading = false;
-    notifyListeners();
-
-    return result;
+    try {
+      final result = await registerUser(user);
+      return result;
+    } catch (_) {
+      errorMessage = 'Không thể tạo tài khoản. Vui lòng thử lại.';
+      return null;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
   }
 
   @override

@@ -30,6 +30,7 @@ class ProfileCubit extends Cubit<ProfileState> {
           status: ProfileStatus.loaded,
           profile: DemoData.currentProfile,
           threads: profileThreads,
+          followerPreviews: [],
         ),
       );
       return;
@@ -38,14 +39,19 @@ class ProfileCubit extends Cubit<ProfileState> {
     emit(const ProfileState(status: ProfileStatus.loading));
 
     try {
-      final profile = await _repository.getProfileById(userId);
-      final postsPage = await _repository.getUserPosts(userId);
+      final profileFuture = _repository.getProfileById(userId);
+      final postsFuture = _repository.getUserPosts(userId);
+      final followersFuture = _repository.getFollowers(userId);
+      final profile = await profileFuture;
+      final postsPage = await postsFuture;
+      final followersPage = await followersFuture;
 
       emit(
         ProfileState(
           status: ProfileStatus.loaded,
           profile: profile,
           threads: postsPage.items,
+          followerPreviews: followersPage.items.take(3).toList(growable: false),
         ),
       );
     } on ApiException catch (error) {

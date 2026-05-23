@@ -234,6 +234,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: ProfileConnectionsSummary(
                           profile: profile,
+                          followerPreviews: state.followerPreviews,
                           onFollowersTap: () => _openConnections(
                             ProfileConnectionsMode.followers,
                           ),
@@ -600,11 +601,13 @@ class ProfileConnectionsSummary extends StatelessWidget {
   const ProfileConnectionsSummary({
     super.key,
     required this.profile,
+    required this.followerPreviews,
     required this.onFollowersTap,
     required this.onFollowingTap,
   });
 
   final UserProfile profile;
+  final List<UserProfile> followerPreviews;
   final VoidCallback onFollowersTap;
   final VoidCallback onFollowingTap;
 
@@ -622,36 +625,28 @@ class ProfileConnectionsSummary extends StatelessWidget {
       spacing: 10,
       runSpacing: 6,
       children: [
-        SizedBox(
-          width: 72,
-          height: 28,
-          child: Stack(
-            children: List.generate(profileFollowerPreviewAssets.length, (
-              index,
-            ) {
-              return Positioned(
-                left: index * 18,
-                child: CircleAvatar(
-                  radius: 14,
-                  backgroundColor: colorScheme.surface,
-                  child: CircleAvatar(
-                    radius: 12,
-                    backgroundImage: AssetImage(
-                      profileFollowerPreviewAssets[index],
-                    ),
+        if (followerPreviews.isNotEmpty)
+          SizedBox(
+            width: 18.0 * (followerPreviews.length - 1) + 28,
+            height: 28,
+            child: Stack(
+              children: List.generate(followerPreviews.length, (index) {
+                return Positioned(
+                  left: index * 18,
+                  child: _FollowerAvatarBubble(
+                    avatarUrl: followerPreviews[index].avatarUrl,
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
-        ),
         InkWell(
           onTap: onFollowersTap,
           borderRadius: BorderRadius.circular(999),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             child: Text(
-              '${profile.followersCount} nguoi theo doi',
+              '${profile.followersCount} người theo dõi',
               style: textStyle,
             ),
           ),
@@ -662,7 +657,7 @@ class ProfileConnectionsSummary extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             child: Text(
-              '${profile.followingCount} dang theo doi',
+              '${profile.followingCount} đang theo dõi',
               style: textStyle,
             ),
           ),
@@ -676,11 +671,13 @@ class ProfileFollowersPreview extends StatelessWidget {
   const ProfileFollowersPreview({
     super.key,
     required this.profile,
+    required this.followerPreviews,
     required this.onFollowersTap,
     required this.onFollowingTap,
   });
 
   final UserProfile profile;
+  final List<UserProfile> followerPreviews;
   final VoidCallback onFollowersTap;
   final VoidCallback onFollowingTap;
 
@@ -724,6 +721,35 @@ class ProfileFollowersPreview extends StatelessWidget {
         Text('${profile.followersCount} người theo dõi', style: textStyle),
         Text('${profile.followingCount} đang theo dõi', style: textStyle),
       ],
+    );
+  }
+}
+
+class _FollowerAvatarBubble extends StatelessWidget {
+  const _FollowerAvatarBubble({required this.avatarUrl});
+
+  final String? avatarUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final hasAvatar = avatarUrl != null && avatarUrl!.trim().isNotEmpty;
+
+    return CircleAvatar(
+      radius: 14,
+      backgroundColor: colorScheme.surface,
+      child: CircleAvatar(
+        radius: 12,
+        backgroundColor: colorScheme.surfaceContainerHighest,
+        backgroundImage: hasAvatar ? NetworkImage(avatarUrl!.trim()) : null,
+        child: hasAvatar
+            ? null
+            : Icon(
+                Icons.person,
+                size: 14,
+                color: colorScheme.onSurfaceVariant,
+              ),
+      ),
     );
   }
 }
@@ -1251,7 +1277,10 @@ class ProfileComposerPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CreatePostCard(
-      currentUser: FeedUser(username: profile.username, avatarAsset: null),
+      currentUser: FeedUser(
+        username: profile.username,
+        avatarAsset: profile.avatarUrl,
+      ),
     );
   }
 }
