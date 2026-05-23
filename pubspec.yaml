@@ -95,6 +95,9 @@ flutter:
         - asset: assets/fonts/Roboto/Roboto-Bold.ttf
         - asset: assets/fonts/Roboto/Roboto-Thin.ttf
   
+  config:
+    enable-swift-package-manager: false
+  
 flutter_gen:
   output: lib/generated/
   integrations:
