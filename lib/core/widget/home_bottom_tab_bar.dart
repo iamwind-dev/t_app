@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'package:t_app/core/theme/app_icon_tokens.dart';
 
-class _BottomTabIcon {
-  const _BottomTabIcon({
+class BottomTabIconAssets {
+  const BottomTabIconAssets({
     required this.selectedAsset,
     required this.deselectedAsset,
   });
@@ -24,24 +24,26 @@ class HomeBottomTabBar extends StatelessWidget {
   final ValueChanged<int> onTap;
   final VoidCallback? onReelsCreateTap;
 
-  static const _icons = [
-    _BottomTabIcon(
+  static const double baseHeight = 60;
+
+  static const icons = [
+    BottomTabIconAssets(
       selectedAsset: 'assets/icons/bottom/Light=Home_Select.png',
       deselectedAsset: 'assets/icons/bottom/Light=Home_Deselect.png',
     ),
-    _BottomTabIcon(
-      selectedAsset: 'assets/icons/message.png',
-      deselectedAsset: 'assets/icons/message.png',
+    BottomTabIconAssets(
+      selectedAsset: 'assets/icons/bottom/send_deselect.png',
+      deselectedAsset: 'assets/icons/bottom/send.png',
     ),
-    _BottomTabIcon(
+    BottomTabIconAssets(
       selectedAsset: 'assets/icons/bottom/Light=Reel_Select.png',
       deselectedAsset: 'assets/icons/bottom/Light=Reel_Deselect.png',
     ),
-    _BottomTabIcon(
+    BottomTabIconAssets(
       selectedAsset: 'assets/icons/bottom/Light=Activity_Select.png',
       deselectedAsset: 'assets/icons/bottom/Light=Activity_Deselect.png',
     ),
-    _BottomTabIcon(
+    BottomTabIconAssets(
       selectedAsset: 'assets/icons/bottom/Light=Profile_Select.png',
       deselectedAsset: 'assets/icons/bottom/Light=Profile_Deselect.png',
     ),
@@ -53,15 +55,15 @@ class HomeBottomTabBar extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      height: 78 + bottomInset,
+      height: baseHeight + bottomInset,
       padding: EdgeInsets.only(bottom: bottomInset),
       decoration: BoxDecoration(
         color: colorScheme.surface,
         // border: Border(top: BorderSide(color: theme.dividerColor)),
       ),
       child: Row(
-        children: List.generate(_icons.length, (index) {
-          final icon = _icons[index];
+        children: List.generate(icons.length, (index) {
+          final icon = icons[index];
           final isSelected = selectedIndex == index;
           final isReelsCreateAction =
               index == 2 && isSelected && onReelsCreateTap != null;

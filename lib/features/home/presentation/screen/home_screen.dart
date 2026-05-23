@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:t_app/features/activity/presentation/screen/activity_screen.dart';
-import 'package:t_app/core/widget/home_bottom_tab_bar.dart';
+import 'package:t_app/core/utils/platform_info_service.dart';
+import 'package:t_app/core/widget/adaptive_bottom_nav_bar.dart';
 import 'package:t_app/features/auth/data/auth_user.dart';
 import 'package:t_app/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:t_app/features/chat/data/chat_socket_service.dart';
@@ -22,6 +23,7 @@ import 'package:t_app/features/search/presentation/theme/search_tokens.dart';
 import '../cubits/home_cubit.dart';
 import '../cubits/home_state.dart';
 import '../widget/create_post_card.dart';
+import '../widget/home_feed_skeleton.dart';
 import '../widget/home_thread_preview_block.dart';
 import '../widget/home_header.dart';
 import '../widget/post_divider.dart';
@@ -41,6 +43,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _isBottomBarVisible = true;
   bool _isHeaderCompact = false;
   double _lastOffset = 0;
+  double _headerStretchOffset = 0;
+  bool _useNativeLiquidGlassBottomBar = false;
 
   @override
   void initState() {
@@ -48,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
 
     _scrollController = ScrollController()..addListener(_handleScroll);
+    unawaited(_resolveBottomNavStyle());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -109,7 +114,42 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   double _bottomSpace(BuildContext context) {
-    return _barHeight + MediaQuery.paddingOf(context).bottom + 12;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    if (_useNativeLiquidGlassBottomBar) {
+      return AdaptiveBottomNavBar.iosGlassHeight +
+          AdaptiveBottomNavBar.iosGlassBottomMargin +
+          bottomInset +
+          28;
+    }
+
+    return _barHeight + bottomInset + 12;
+  }
+
+  bool _handleHomeScrollNotification(ScrollNotification notification) {
+    final metrics = notification.metrics;
+    if (metrics.axis != Axis.vertical) {
+      return false;
+    }
+
+    final overscroll = metrics.pixels < metrics.minScrollExtent
+        ? (metrics.minScrollExtent - metrics.pixels).clamp(0.0, 64.0)
+        : 0.0;
+
+    if (overscroll != _headerStretchOffset && mounted) {
+      setState(() {
+        _headerStretchOffset = overscroll;
+      });
+    }
+
+    if (notification is ScrollEndNotification &&
+        _headerStretchOffset != 0 &&
+        mounted) {
+      setState(() {
+        _headerStretchOffset = 0;
+      });
+    }
+
+    return false;
   }
 
   User _buildCurrentUser(HomeState state, AuthUser? authUser) {
@@ -173,6 +213,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     showCreateReelSheet(context);
   }
 
+  void _openSearch() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => Scaffold(
+          backgroundColor: SearchTokens.pageBackground(context),
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            shadowColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+            leading: const BackButton(),
+          ),
+          body: const SearchScreen(
+            bottomPadding: 16,
+          ),
+        ),
+      ),
+    );
+  }
+
   void _openThreadDetail(ThreadItemModel rootThread) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -197,12 +258,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _refreshHomeFeed() async {
     await context.read<HomeCubit>().refreshFeed();
+    if (mounted && _headerStretchOffset != 0) {
+      setState(() {
+        _headerStretchOffset = 0;
+      });
+    }
   }
 
   Future<void> _bindFeedRealtime() async {
     final socketService = context.read<ChatSocketService>();
     await socketService.connect();
     await socketService.joinRoom('feed:global');
+  }
+
+  Future<void> _resolveBottomNavStyle() async {
+    final useNativeLiquidGlass =
+        await PlatformInfoService.supportsNativeLiquidGlassBottomNav();
+    if (!mounted || useNativeLiquidGlass == _useNativeLiquidGlassBottomBar) {
+      return;
+    }
+
+    setState(() {
+      _useNativeLiquidGlassBottomBar = useNativeLiquidGlass;
+    });
   }
 
   Future<void> _syncOnResume() async {
@@ -249,6 +327,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               _isBottomBarVisible;
 
           return Scaffold(
+            extendBody: _useNativeLiquidGlassBottomBar,
             body: SafeArea(
               bottom: false,
               child: Stack(
@@ -277,132 +356,98 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   else
                     Column(
                       children: [
-                        HomeHeader(isCompact: _isHeaderCompact),
+                        HomeHeader(
+                          isCompact: _isHeaderCompact,
+                          onSearchTap: _openSearch,
+                          stretchOffset: _headerStretchOffset,
+                        ),
                         Expanded(
-                          child: RefreshIndicator(
-                            onRefresh: _refreshHomeFeed,
-                            child: ListView.separated(
-                              controller: _scrollController,
-                              physics:
-                                  const AlwaysScrollableScrollPhysics(),
-                              padding: EdgeInsets.only(
-                                bottom: shouldShowBottomBar
-                                    ? _bottomSpace(context)
-                                    : 12,
-                              ),
-                              itemCount: state.rootThreads.length +
-                                  1 +
-                                  (state.isLoadingMore ? 1 : 0),
-                              itemBuilder: (context, index) {
-                                if (index == 0) {
-                                  return CreatePostCard(
-                                    currentUser: _buildCurrentUser(
-                                      state,
-                                      currentUser,
-                                    ),
-                                    onTap: () => _openCreateThreadSheet(
-                                      state,
-                                      currentUser,
-                                    ),
-                                  );
-                                }
-
-                                if (state.isLoadingMore &&
-                                    index ==
-                                        state.rootThreads.length + 1) {
-                                  return const Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: 16,
-                                    ),
-                                    child: Center(
-                                      child: SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child:
-                                            CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
+                          child: NotificationListener<ScrollNotification>(
+                            onNotification: _handleHomeScrollNotification,
+                            child: RefreshIndicator(
+                              onRefresh: _refreshHomeFeed,
+                              child: state.isInitialLoading
+                                  ? HomeFeedSkeletonList(
+                                      itemCount: 5,
+                                      includeComposerGap: true,
+                                      bottomPadding: shouldShowBottomBar
+                                          ? _bottomSpace(context)
+                                          : 12,
+                                    )
+                                  : ListView.separated(
+                                      controller: _scrollController,
+                                      physics:
+                                          const AlwaysScrollableScrollPhysics(
+                                        parent: BouncingScrollPhysics(),
                                       ),
+                                      padding: EdgeInsets.only(
+                                        bottom: shouldShowBottomBar
+                                            ? _bottomSpace(context)
+                                            : 12,
+                                      ),
+                                      itemCount: state.rootThreads.length +
+                                          1 +
+                                          (state.isLoadingMore ? 1 : 0),
+                                      itemBuilder: (context, index) {
+                                        if (index == 0) {
+                                          return CreatePostCard(
+                                            currentUser: _buildCurrentUser(
+                                              state,
+                                              currentUser,
+                                            ),
+                                            onTap: () => _openCreateThreadSheet(
+                                              state,
+                                              currentUser,
+                                            ),
+                                          );
+                                        }
+
+                                        if (state.isLoadingMore &&
+                                            index ==
+                                                state.rootThreads.length + 1) {
+                                          return const HomeLoadMoreSkeleton();
+                                        }
+
+                                        final rootThread =
+                                            state.rootThreads[index - 1];
+
+                                        return Padding(
+                                          padding: const EdgeInsets.fromLTRB(
+                                            0,
+                                            14,
+                                            0,
+                                            16,
+                                          ),
+                                          child: HomeThreadPreviewBlock(
+                                            rootThread: rootThread,
+                                            onRootTap: () =>
+                                                _openThreadDetail(rootThread),
+                                            onReplyTap: () =>
+                                                _openThreadDetail(rootThread),
+                                            onLikeTap: context
+                                                .read<HomeCubit>()
+                                                .togglePostLike,
+                                            onPreviewReplyTap: (replyThread) =>
+                                                _openThreadBranch(
+                                              rootThread: rootThread,
+                                              selectedThread: replyThread,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      separatorBuilder: (context, index) {
+                                        if (state.isLoadingMore &&
+                                            index == state.rootThreads.length) {
+                                          return const SizedBox.shrink();
+                                        }
+
+                                        return const PostDivider();
+                                      },
                                     ),
-                                  );
-                                }
-
-                                final rootThread =
-                                    state.rootThreads[index - 1];
-
-                                return Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    0,
-                                    14,
-                                    0,
-                                    16,
-                                  ),
-                                  child: HomeThreadPreviewBlock(
-                                    rootThread: rootThread,
-                                    onRootTap: () =>
-                                        _openThreadDetail(rootThread),
-                                    onReplyTap: () =>
-                                        _openThreadDetail(rootThread),
-                                    onLikeTap: context
-                                        .read<HomeCubit>()
-                                        .togglePostLike,
-                                    onPreviewReplyTap: (replyThread) =>
-                                        _openThreadBranch(
-                                      rootThread: rootThread,
-                                      selectedThread: replyThread,
-                                    ),
-                                  ),
-                                );
-                              },
-                              separatorBuilder: (context, index) {
-                                if (state.isLoadingMore &&
-                                    index == state.rootThreads.length) {
-                                  return const SizedBox.shrink();
-                                }
-
-                                return const PostDivider();
-                              },
                             ),
                           ),
                         ),
                       ],
-                    ),
-                  if (!isMessageTab &&
-                      !isReelsTab &&
-                      !isActivityTab &&
-                      !isProfileTab)
-                    Positioned(
-                      top: 8,
-                      right: 10,
-                      child: IconButton(
-                        icon: const Icon(Icons.search, size: 28),
-                        color: Theme.of(context).colorScheme.onSurface,
-                        splashColor: Colors.transparent,
-                        highlightColor: Colors.transparent,
-                        hoverColor: Colors.transparent,
-                        focusColor: Colors.transparent,
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (context) => Scaffold(
-                                backgroundColor:
-                                    SearchTokens.pageBackground(context),
-                                appBar: AppBar(
-                                  backgroundColor: Colors.transparent,
-                                  elevation: 0,
-                                  scrolledUnderElevation: 0,
-                                  shadowColor: Colors.transparent,
-                                  surfaceTintColor: Colors.transparent,
-                                  leading: const BackButton(),
-                                ),
-                                body: const SearchScreen(
-                                  bottomPadding: 16,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
                     ),
                   Positioned(
                     left: 0,
@@ -420,8 +465,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         opacity: shouldShowBottomBar ? 1 : 0,
                         child: IgnorePointer(
                           ignoring: !shouldShowBottomBar,
-                          child: HomeBottomTabBar(
+                          child: AdaptiveBottomNavBar(
                             selectedIndex: state.selectedTabIndex,
+                            useNativeLiquidGlass:
+                                _useNativeLiquidGlassBottomBar,
                             onTap: (index) =>
                                 _handleBottomTabTap(index, state),
                             onReelsCreateTap: _openCreateReelSheet,

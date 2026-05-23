@@ -21,7 +21,7 @@ class ReelCommentModel extends ReelComment {
 
     return ReelCommentModel(
       id: json['id'] as String,
-      reelId: json['reelId'] as String,
+      reelId: json['reelId'] as String? ?? json['postId'] as String? ?? '',
       username: author['username'] as String? ?? '',
       displayName: author['displayName'] as String? ?? '',
       avatarUrl: BackendUrlNormalizer.normalizeNullable(

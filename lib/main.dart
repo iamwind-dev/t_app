@@ -217,6 +217,7 @@ class TogetherApp extends StatelessWidget {
   final ChatSocketService chatSocketService;
   final ReelsRepository reelsRepository;
 
+  /// Wires shared repositories and defers authenticated feature loading.
   @override
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
@@ -260,7 +261,7 @@ class TogetherApp extends StatelessWidget {
                 ReelsCubit(
                   getReels: GetReels(reelsRepository),
                   repository: reelsRepository,
-                )..loadReels(),
+                ),
           ),
         ],
         child: BlocBuilder<ThemeModeCubit, ThemeMode>(
@@ -288,6 +289,7 @@ class TogetherApp extends StatelessWidget {
 class _AuthGate extends StatelessWidget {
   const _AuthGate();
 
+  /// Starts authenticated side effects only after the session is confirmed.
   @override
   Widget build(BuildContext context) {
     return BlocListener<AuthCubit, AuthState>(
@@ -295,6 +297,7 @@ class _AuthGate extends StatelessWidget {
           previous.status != current.status &&
           current.status == AuthStatus.authenticated,
       listener: (context, state) {
+        unawaited(context.read<ReelsCubit>().loadReels());
         unawaited(_syncFcmTokenSafely(context));
         unawaited(context.read<ChatSocketService>().connect());
         unawaited(context.read<ChatSocketService>().joinRoom('feed:global'));

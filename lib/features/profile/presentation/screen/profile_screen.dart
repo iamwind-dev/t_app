@@ -230,7 +230,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
                       const SizedBox(height: 16),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: ProfileConnectionsSummary(
                           profile: profile,
                           followerPreviews: state.followerPreviews,
@@ -470,7 +470,7 @@ class ProfileHeaderSection extends StatelessWidget {
                 right: 0,
                 child: AvatarView(user: _profileToUser(profile), radius: 40),
               ),
-              if (isMe)
+              if (!isMe && !profile.isFollowing)
                 Positioned(
                   left: 0,
                   bottom: 14,
@@ -619,15 +619,17 @@ class ProfileConnectionsSummary extends StatelessWidget {
       fontWeight: FontWeight.w500,
     );
 
-    return Wrap(
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 10,
-      runSpacing: 6,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Wrap(
+      crossAxisAlignment: WrapCrossAlignment.start,
+      spacing: 1,
+      runSpacing: 1,
       children: [
         if (followerPreviews.isNotEmpty)
           SizedBox(
             width: 18.0 * (followerPreviews.length - 1) + 28,
-            height: 28,
+            height: 20,
             child: Stack(
               children: List.generate(followerPreviews.length, (index) {
                 return Positioned(
@@ -650,6 +652,7 @@ class ProfileConnectionsSummary extends StatelessWidget {
             ),
           ),
         ),
+        SizedBox(width: 10),
         InkWell(
           onTap: onFollowingTap,
           borderRadius: BorderRadius.circular(999),
@@ -662,6 +665,7 @@ class ProfileConnectionsSummary extends StatelessWidget {
           ),
         ),
       ],
+      ),
     );
   }
 }
@@ -735,7 +739,7 @@ class _FollowerAvatarBubble extends StatelessWidget {
     final hasAvatar = avatarUrl != null && avatarUrl!.trim().isNotEmpty;
 
     return CircleAvatar(
-      radius: 14,
+      radius: 10,
       backgroundColor: colorScheme.surface,
       child: CircleAvatar(
         radius: 12,
@@ -1319,11 +1323,11 @@ class _ProfileThreadsTab extends StatelessWidget {
         final thread = threads[index - (isMe ? 1 : 0)];
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-          child: ThreadItemWidget(
-            thread: thread,
-            onTap: () => onThreadTap(thread),
+          child: ThreadPreviewBlock(
+            rootThread: thread,
+            onRootTap: () => onThreadTap(thread),
             onReplyTap: () => onThreadTap(thread),
-            showReplyHint: false,
+            onPreviewReplyTap: onThreadTap,
           ),
         );
       },

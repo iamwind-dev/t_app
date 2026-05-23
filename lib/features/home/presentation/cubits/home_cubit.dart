@@ -55,11 +55,12 @@ class HomeCubit extends Cubit<HomeState> {
 
     try {
       final page = await _repository.getFeed(limit: 10);
+      final hydratedThreads = await _hydrateFeedPreviewReplies(page.items);
 
       emit(
         state.copyWith(
           status: HomeFeedStatus.loaded,
-          rootThreads: page.items,
+          rootThreads: hydratedThreads,
           nextCursor: page.pageInfo.nextCursor,
           hasMore: page.pageInfo.hasNextPage,
           lastLoadedAtEpochMs: DateTime.now().millisecondsSinceEpoch,
@@ -113,11 +114,12 @@ class HomeCubit extends Cubit<HomeState> {
       }
 
       final page = await _repository.getFeed(limit: 10);
+      final hydratedThreads = await _hydrateFeedPreviewReplies(page.items);
 
       emit(
         state.copyWith(
           status: HomeFeedStatus.loaded,
-          rootThreads: page.items,
+          rootThreads: hydratedThreads,
           nextCursor: page.pageInfo.nextCursor,
           hasMore: page.pageInfo.hasNextPage,
           lastLoadedAtEpochMs: DateTime.now().millisecondsSinceEpoch,
@@ -173,9 +175,10 @@ class HomeCubit extends Cubit<HomeState> {
         limit: 10,
         cursor: state.nextCursor,
       );
+      final hydratedThreads = await _hydrateFeedPreviewReplies(page.items);
 
       final existingIds = state.rootThreads.map((e) => e.id).toSet();
-      final uniqueIncoming = page.items
+      final uniqueIncoming = hydratedThreads
           .where((item) => !existingIds.contains(item.id))
           .toList(growable: false);
 
@@ -398,6 +401,34 @@ class HomeCubit extends Cubit<HomeState> {
     final elapsed = DateTime.now().millisecondsSinceEpoch - lastLoadedAt;
     if (elapsed >= maxAge.inMilliseconds) {
       await loadHomeFeed();
+    }
+  }
+
+  Future<List<ThreadItemModel>> _hydrateFeedPreviewReplies(
+    List<ThreadItemModel> threads,
+  ) async {
+    if (threads.isEmpty) {
+      return const <ThreadItemModel>[];
+    }
+
+    return Future.wait(threads.map(_hydratePreviewReply));
+  }
+
+  Future<ThreadItemModel> _hydratePreviewReply(ThreadItemModel thread) async {
+    if (thread.previewReply != null || thread.replyCount <= 0 || !thread.isRootThread) {
+      return thread;
+    }
+
+    try {
+      final replies = await _repository.getPostReplies(thread.id, limit: 1);
+      final previewReply = replies.items.isEmpty ? null : replies.items.first;
+      if (previewReply == null) {
+        return thread;
+      }
+
+      return thread.copyWith(previewReplies: [previewReply]);
+    } catch (_) {
+      return thread;
     }
   }
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:t_app/core/theme/app_icon_tokens.dart';
+import 'package:t_app/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 import 'package:t_app/features/users/presentation/widgets/user_avatar_button.dart';
 import 'package:t_app/features/users/presentation/widgets/user_name_button.dart';
@@ -66,7 +68,9 @@ class ThreadItemWidget extends StatelessWidget {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               curve: Curves.easeOutCubic,
-              padding: highlighted ? const EdgeInsets.all(12) : EdgeInsets.zero,
+              padding: highlighted
+                  ? const EdgeInsetsDirectional.fromSTEB(12, 12, 16, 12)
+                  : const EdgeInsetsDirectional.only(end: 16),
               decoration: highlighted
                   ? BoxDecoration(
                       color: colorScheme.surfaceContainerLow,
@@ -199,8 +203,8 @@ class ThreadContentSection extends StatelessWidget {
         content: thread.content,
         textStyle: textStyle,
         shouldBlur: shouldBlur,
-        moderationAction: thread.moderationAction,
-        moderationLabel: thread.moderationLabel,
+        moderationAction: thread.effectiveModerationAction,
+        moderationLabel: thread.effectiveModerationLabel,
       );
     }
 
@@ -211,8 +215,8 @@ class ThreadContentSection extends StatelessWidget {
         content: thread.content,
         textStyle: textStyle,
         shouldBlur: shouldBlur,
-        moderationAction: thread.moderationAction,
-        moderationLabel: thread.moderationLabel,
+        moderationAction: thread.effectiveModerationAction,
+        moderationLabel: thread.effectiveModerationLabel,
       );
     }
 
@@ -222,8 +226,8 @@ class ThreadContentSection extends StatelessWidget {
         content: paragraphs.join('\n\n'),
         style: textStyle,
         shouldBlur: shouldBlur,
-        moderationLabel: thread.moderationLabel,
-        moderationAction: thread.moderationAction,
+        moderationLabel: thread.effectiveModerationLabel,
+        moderationAction: thread.effectiveModerationAction,
       ),
     );
   }
@@ -236,13 +240,219 @@ class ThreadMediaSectionWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return buildModeratedContent(
-      context: context,
-      shouldBlur: thread.shouldBlurVisibleContent,
-      moderationLabel: thread.moderationLabel,
-      moderationAction: thread.moderationAction,
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
       child: ThreadMediaSection(imageUrls: thread.imageUrls),
     );
+  }
+}
+
+class ThreadPreviewBlock extends StatefulWidget {
+  const ThreadPreviewBlock({
+    super.key,
+    required this.rootThread,
+    required this.onRootTap,
+    required this.onReplyTap,
+    required this.onPreviewReplyTap,
+    this.onLikeTap,
+  });
+
+  final ThreadItemModel rootThread;
+  final VoidCallback onRootTap;
+  final VoidCallback onReplyTap;
+  final ValueChanged<ThreadItemModel> onPreviewReplyTap;
+  final ValueChanged<ThreadItemModel>? onLikeTap;
+
+  @override
+  State<ThreadPreviewBlock> createState() => _ThreadPreviewBlockState();
+}
+
+class _ThreadPreviewBlockState extends State<ThreadPreviewBlock> {
+  final GlobalKey _stackKey = GlobalKey();
+  final List<GlobalKey> _itemKeys = <GlobalKey>[];
+  List<double> _avatarCenters = const <double>[];
+
+  ThreadItemModel? get _previewReply => widget.rootThread.previewReply;
+
+  List<ThreadItemModel> get _threads => [
+    widget.rootThread,
+    if (_previewReply != null) _previewReply!,
+  ];
+
+  bool get _hasPreviewReplies => _previewReply != null;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateAvatarCenters());
+  }
+
+  @override
+  void didUpdateWidget(covariant ThreadPreviewBlock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateAvatarCenters());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    while (_itemKeys.length < _threads.length) {
+      _itemKeys.add(GlobalKey());
+    }
+    while (_itemKeys.length > _threads.length) {
+      _itemKeys.removeLast();
+    }
+
+    if (!_hasPreviewReplies) {
+      return ThreadItemWidget(
+        thread: widget.rootThread,
+        onTap: widget.onRootTap,
+        onReplyTap: widget.onReplyTap,
+        onLikeTap: widget.onLikeTap == null
+            ? null
+            : () => widget.onLikeTap!(widget.rootThread),
+        showReplyHint: false,
+        enableContentBlurDemo: true,
+      );
+    }
+
+    return Stack(
+      key: _stackKey,
+      children: [
+        Positioned.fill(
+          child: IgnorePointer(
+            child: CustomPaint(
+              painter: _ThreadPreviewConnectorPainter(
+                avatarCenters: _avatarCenters,
+                color: Theme.of(context).dividerColor.withValues(alpha: 0.95),
+                lineWidth: 1.5,
+                x: ThreadItemWidget.timelineWidth / 2,
+              ),
+            ),
+          ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: List.generate(_threads.length, (index) {
+            final thread = _threads[index];
+            final isRootThread = index == 0;
+
+            return Padding(
+              key: _itemKeys[index],
+              padding: EdgeInsets.only(
+                bottom: index == _threads.length - 1 ? 0 : 12,
+              ),
+              child: ThreadItemWidget(
+                thread: thread,
+                onTap: isRootThread
+                    ? widget.onRootTap
+                    : () => widget.onPreviewReplyTap(thread),
+                onReplyTap: isRootThread
+                    ? widget.onReplyTap
+                    : () => widget.onPreviewReplyTap(thread),
+                onLikeTap: widget.onLikeTap == null
+                    ? null
+                    : () => widget.onLikeTap!(thread),
+                showTimelineConnectors: false,
+                showReplyHint: false,
+                enableContentBlurDemo: true,
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  void _updateAvatarCenters() {
+    final stackContext = _stackKey.currentContext;
+    if (stackContext == null) {
+      return;
+    }
+
+    final stackBox = stackContext.findRenderObject() as RenderBox?;
+    if (stackBox == null || !stackBox.hasSize) {
+      return;
+    }
+
+    final centers = <double>[];
+    for (final key in _itemKeys) {
+      final itemContext = key.currentContext;
+      if (itemContext == null) {
+        return;
+      }
+
+      final itemBox = itemContext.findRenderObject() as RenderBox?;
+      if (itemBox == null || !itemBox.hasSize) {
+        return;
+      }
+
+      final offset = itemBox.localToGlobal(Offset.zero, ancestor: stackBox);
+      centers.add(offset.dy + ThreadItemWidget.avatarRadius);
+    }
+
+    if (_sameCenters(_avatarCenters, centers)) {
+      return;
+    }
+
+    setState(() {
+      _avatarCenters = centers;
+    });
+  }
+
+  bool _sameCenters(List<double> previous, List<double> next) {
+    if (previous.length != next.length) {
+      return false;
+    }
+
+    for (var i = 0; i < previous.length; i++) {
+      if ((previous[i] - next[i]).abs() > 0.5) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+}
+
+class _ThreadPreviewConnectorPainter extends CustomPainter {
+  const _ThreadPreviewConnectorPainter({
+    required this.avatarCenters,
+    required this.color,
+    required this.lineWidth,
+    required this.x,
+  });
+
+  final List<double> avatarCenters;
+  final Color color;
+  final double lineWidth;
+  final double x;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (avatarCenters.length < 2) {
+      return;
+    }
+
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = lineWidth
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawLine(
+      Offset(x, avatarCenters.first),
+      Offset(x, avatarCenters.last),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ThreadPreviewConnectorPainter oldDelegate) {
+    return oldDelegate.avatarCenters != avatarCenters ||
+        oldDelegate.color != color ||
+        oldDelegate.lineWidth != lineWidth ||
+        oldDelegate.x != x;
   }
 }
 
@@ -311,6 +521,9 @@ class _ThreadAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final currentUserId = context.read<AuthCubit>().state.user?.id;
+    final shouldShowFollowBadge =
+        thread.author.id != currentUserId && !thread.author.isFollowing;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -323,37 +536,38 @@ class _ThreadAvatar extends StatelessWidget {
           username: thread.author.username,
           size: ThreadItemWidget.avatarRadius * 2,
         ),
-        Positioned(
-          right: -2,
-          bottom: -2,
-          child: Container(
-            width: 16,
-            height: 16,
-            decoration: BoxDecoration(
-              color: colorScheme.surface,
-              shape: BoxShape.circle,
-              border: Border.all(color: colorScheme.surface, width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: DecoratedBox(
+        if (shouldShowFollowBadge)
+          Positioned(
+            right: -2,
+            bottom: -2,
+            child: Container(
+              width: 16,
+              height: 16,
               decoration: BoxDecoration(
-                color: colorScheme.onSurface,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.add_rounded,
-                size: 11,
                 color: colorScheme.surface,
+                shape: BoxShape.circle,
+                border: Border.all(color: colorScheme.surface, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colorScheme.onSurface,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.add_rounded,
+                  size: 11,
+                  color: colorScheme.surface,
+                ),
               ),
             ),
           ),
-        ),
       ],
     );
   }

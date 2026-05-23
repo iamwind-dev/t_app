@@ -43,6 +43,11 @@ class HomeState extends Equatable {
   final String? nextCursor;
   final bool isRefreshing;
 
+  bool get isInitialLoading =>
+      status == HomeFeedStatus.loading && rootThreads.isEmpty;
+  bool get isLoaded => status == HomeFeedStatus.loaded;
+  bool get hasError => status == HomeFeedStatus.failure;
+
   HomeState copyWith({
     HomeFeedStatus? status,
     FeedUser? currentUser,

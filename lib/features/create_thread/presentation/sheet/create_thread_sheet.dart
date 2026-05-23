@@ -981,11 +981,14 @@ class _ComposerImageCard extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(18),
-          child: Image.memory(
-            attachment.bytes,
-            width: 92,
-            height: 92,
-            fit: BoxFit.cover,
+          child: ColoredBox(
+            color: colorScheme.surfaceContainerLow,
+            child: Image.memory(
+              attachment.bytes,
+              width: 92,
+              height: 92,
+              fit: BoxFit.contain,
+            ),
           ),
         ),
         Positioned(

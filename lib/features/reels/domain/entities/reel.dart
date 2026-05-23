@@ -12,6 +12,7 @@ class Reel extends Equatable {
   final int likes;
   final int comments;
   final bool isLiked;
+  final bool isFollowing;
 
   const Reel({
     required this.id,
@@ -25,6 +26,7 @@ class Reel extends Equatable {
     required this.likes,
     required this.comments,
     required this.isLiked,
+    required this.isFollowing,
   });
 
   Reel copyWith({
@@ -40,6 +42,7 @@ class Reel extends Equatable {
     int? likes,
     int? comments,
     bool? isLiked,
+    bool? isFollowing,
   }) {
     return Reel(
       id: id ?? this.id,
@@ -53,6 +56,7 @@ class Reel extends Equatable {
       likes: likes ?? this.likes,
       comments: comments ?? this.comments,
       isLiked: isLiked ?? this.isLiked,
+      isFollowing: isFollowing ?? this.isFollowing,
     );
   }
 
@@ -69,5 +73,6 @@ class Reel extends Equatable {
         likes,
         comments,
         isLiked,
+        isFollowing,
       ];
 }

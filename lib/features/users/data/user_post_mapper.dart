@@ -40,6 +40,7 @@ class UserPostMapper {
       avatarUrl: BackendUrlNormalizer.normalizeNullable(
         json['avatarUrl'] as String?,
       ),
+      isFollowing: json['isFollowing'] as bool? ?? false,
     );
   }
 

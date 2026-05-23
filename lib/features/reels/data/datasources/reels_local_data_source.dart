@@ -23,6 +23,7 @@ class ReelsLocalDataSourceImpl implements ReelsLocalDataSource {
         likes: 12500,
         comments: 328,
         isLiked: false,
+        isFollowing: false,
       ),
       ReelModel(
         id: '2',
@@ -37,6 +38,7 @@ class ReelsLocalDataSourceImpl implements ReelsLocalDataSource {
         likes: 8930,
         comments: 194,
         isLiked: false,
+        isFollowing: false,
       ),
     ];
   }
