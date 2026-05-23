@@ -142,6 +142,7 @@ Future<void> main() async {
     TogetherApp(
       themeModeStorage: themeModeStorage,
       initialThemeMode: initialThemeMode,
+      apiClient: apiClient,
       tokenStore: tokenStore,
       authRepository: authRepository,
       usersRepository: usersRepository,
@@ -189,6 +190,7 @@ class TogetherApp extends StatelessWidget {
     super.key,
     required this.themeModeStorage,
     required this.initialThemeMode,
+    required this.apiClient,
     required this.tokenStore,
     required this.authRepository,
     required this.usersRepository,
@@ -203,6 +205,7 @@ class TogetherApp extends StatelessWidget {
 
   final ThemeModeStorage themeModeStorage;
   final ThemeMode initialThemeMode;
+  final ApiClient apiClient;
   final ApiTokenStore tokenStore;
   final AuthSessionRepository authRepository;
   final UsersProfileRepository usersRepository;
@@ -218,6 +221,7 @@ class TogetherApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
       providers: [
+        RepositoryProvider<ApiClient>.value(value: apiClient),
         RepositoryProvider<ApiTokenStore>.value(value: tokenStore),
         RepositoryProvider<AuthSessionRepository>.value(value: authRepository),
         RepositoryProvider<UsersProfileRepository>.value(

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class OutlineButton extends StatelessWidget {
   final String text;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   const OutlineButton({
     super.key,

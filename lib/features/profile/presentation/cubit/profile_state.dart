@@ -9,6 +9,7 @@ class ProfileState extends Equatable {
     this.status = ProfileStatus.initial,
     this.profile,
     this.threads = const [],
+    this.followerPreviews = const [],
     this.errorMessage,
     this.isSaving = false,
     this.isFollowUpdating = false,
@@ -17,6 +18,7 @@ class ProfileState extends Equatable {
   final ProfileStatus status;
   final UserProfile? profile;
   final List<ThreadItemModel> threads;
+  final List<UserProfile> followerPreviews;
   final String? errorMessage;
   final bool isSaving;
   final bool isFollowUpdating;
@@ -25,6 +27,7 @@ class ProfileState extends Equatable {
     ProfileStatus? status,
     UserProfile? profile,
     List<ThreadItemModel>? threads,
+    List<UserProfile>? followerPreviews,
     String? errorMessage,
     bool? isSaving,
     bool? isFollowUpdating,
@@ -34,6 +37,7 @@ class ProfileState extends Equatable {
       status: status ?? this.status,
       profile: profile ?? this.profile,
       threads: threads ?? this.threads,
+      followerPreviews: followerPreviews ?? this.followerPreviews,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       isSaving: isSaving ?? this.isSaving,
       isFollowUpdating: isFollowUpdating ?? this.isFollowUpdating,
@@ -45,6 +49,7 @@ class ProfileState extends Equatable {
     status,
     profile,
     threads,
+    followerPreviews,
     errorMessage,
     isSaving,
     isFollowUpdating,

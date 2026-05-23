@@ -187,7 +187,7 @@ class _LoginFormState extends State<_LoginForm> {
                   : () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => RegisterScreen.withDependencies(),
+                          builder: (_) => RegisterScreen.withDependencies(context),
                         ),
                       );
                     },
