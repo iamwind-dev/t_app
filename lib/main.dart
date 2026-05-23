@@ -2,8 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
-// Temporarily disabled for iOS sideload splash debugging.
-// import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -45,10 +44,10 @@ import 'features/users/domain/users_profile_repository.dart';
 
 import 'firebase_options.dart';
 
-// Temporarily disabled for iOS sideload splash debugging.
-// Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-//   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-// }
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,8 +69,7 @@ Future<void> main() async {
     return;
   }
 
-  // Temporarily disabled for iOS sideload splash debugging.
-  // FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   late final ThemeModeStorage themeModeStorage;
   late final ThemeMode initialThemeMode;
@@ -92,10 +90,12 @@ Future<void> main() async {
 
   const tokenStore = SecureApiTokenStore();
 
+  final apiBaseUrl = AppConfig.apiBaseUrl.trim();
+
   final apiClient = ApiClient(
     dio: Dio(
       BaseOptions(
-        baseUrl: AppConfig.apiBaseUrl.trim(),
+        baseUrl: apiBaseUrl,
       ),
     ),
     tokenStore: tokenStore,
@@ -116,13 +116,18 @@ Future<void> main() async {
     deviceTokensRepository: deviceTokensRepository,
   );
 
-  // Temporarily disabled for iOS sideload splash debugging.
-  // This may call APNs/FCM token APIs and can hang/fail on sideloaded iOS builds
-  // if push capabilities/signing are not configured correctly.
-  // await fcmTokenService.initialize();
+  // Do not block app startup forever if APNs/FCM fails, especially for
+  // sideloaded iOS builds where push capabilities may not be fully available.
+  try {
+    await fcmTokenService.initialize().timeout(
+      const Duration(seconds: 10),
+    );
+  } catch (error) {
+    debugPrint('FCM initialize error: $error');
+  }
 
   final chatSocketService = SocketIoChatRealtimeClient(
-    baseUrl: AppConfig.apiBaseUrl.trim(),
+    baseUrl: apiBaseUrl,
     tokenStore: tokenStore,
   );
 
@@ -287,9 +292,7 @@ class _AuthGate extends StatelessWidget {
           previous.status != current.status &&
           current.status == AuthStatus.authenticated,
       listener: (context, state) {
-        // Temporarily disabled for iOS sideload splash/debug testing.
-        // unawaited(context.read<FcmTokenService>().syncTokenForAuthenticatedUser());
-
+        unawaited(_syncFcmTokenSafely(context));
         unawaited(context.read<ChatSocketService>().connect());
         unawaited(context.read<ChatSocketService>().joinRoom('feed:global'));
         unawaited(
@@ -310,6 +313,14 @@ class _AuthGate extends StatelessWidget {
         },
       ),
     );
+  }
+
+  Future<void> _syncFcmTokenSafely(BuildContext context) async {
+    try {
+      await context.read<FcmTokenService>().syncTokenForAuthenticatedUser();
+    } catch (error) {
+      debugPrint('FCM token sync error: $error');
+    }
   }
 }
 
