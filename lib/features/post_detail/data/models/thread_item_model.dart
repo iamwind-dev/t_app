@@ -3,10 +3,20 @@ import 'package:equatable/equatable.dart';
 import 'user.dart';
 
 bool shouldBlurModeratedContent({
+  String? moderationStatus,
   String? moderationAction,
   bool? moderationIsWarning,
   String? visibilityLevel,
 }) {
+  final normalizedStatus = moderationStatus?.trim().toLowerCase();
+  if (normalizedStatus != null &&
+      normalizedStatus.isNotEmpty &&
+      normalizedStatus != 'approved' &&
+      normalizedStatus != 'safe' &&
+      normalizedStatus != 'clean' &&
+      normalizedStatus != 'normal') {
+    return true;
+  }
   if (moderationAction == 'WARN_USER') {
     return true;
   }
@@ -24,6 +34,35 @@ bool shouldBlurModeratedContent({
   }
 
   return false;
+}
+
+String inferModerationAction({
+  required String moderationStatus,
+  required String moderationAction,
+  required bool moderationIsWarning,
+  required String visibilityLevel,
+}) {
+  if (moderationAction != 'ALLOW') {
+    return moderationAction;
+  }
+  if (moderationIsWarning) {
+    return 'WARN_USER';
+  }
+
+  final normalizedVisibility = visibilityLevel.trim().toLowerCase();
+  if (normalizedVisibility == 'hidden' || normalizedVisibility == 'review') {
+    return 'BLOCK_OR_REVIEW';
+  }
+
+  final normalizedStatus = moderationStatus.trim().toLowerCase();
+  if (normalizedStatus == 'approved' ||
+      normalizedStatus == 'safe' ||
+      normalizedStatus == 'clean' ||
+      normalizedStatus == 'normal') {
+    return 'ALLOW';
+  }
+
+  return 'WARN_USER';
 }
 
 class ThreadItemModel extends Equatable {
@@ -77,7 +116,17 @@ class ThreadItemModel extends Equatable {
   bool get hasReplies => replyCount > 0 || children.isNotEmpty;
   bool get shouldShowWarningChip => false;
   bool get shouldCollapseModeratedContent => false;
+  String get effectiveModerationAction => inferModerationAction(
+    moderationStatus: moderationStatus,
+    moderationAction: moderationAction,
+    moderationIsWarning: moderationIsWarning,
+    visibilityLevel: visibilityLevel,
+  );
+  String get effectiveModerationLabel => moderationLabel.trim().isEmpty
+      ? 'other'
+      : moderationLabel;
   bool get shouldBlurVisibleContent => shouldBlurModeratedContent(
+    moderationStatus: moderationStatus,
     moderationAction: moderationAction,
     moderationIsWarning: moderationIsWarning,
     visibilityLevel: visibilityLevel,

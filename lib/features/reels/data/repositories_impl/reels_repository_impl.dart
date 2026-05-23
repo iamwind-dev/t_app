@@ -16,7 +16,7 @@ class ReelsRepositoryImpl implements ReelsRepository {
   @override
   Future<List<Reel>> getReels() async {
     final response = await _apiClient.get<Map<String, dynamic>>(
-      '/reels/feed',
+      '/posts/feed',
       decode: _asMap,
     );
 
@@ -27,6 +27,7 @@ class ReelsRepositoryImpl implements ReelsRepository {
 
     return items
         .whereType<Map<String, dynamic>>()
+        .where(_hasVideoMedia)
         .map(ReelModel.fromJson)
         .toList(growable: false);
   }
@@ -34,11 +35,11 @@ class ReelsRepositoryImpl implements ReelsRepository {
   @override
   Future<Reel> getReelById(String reelId) async {
     final response = await _apiClient.get<Map<String, dynamic>>(
-      '/reels/$reelId',
+      '/posts/$reelId',
       decode: _asMap,
     );
 
-    final payload = response['reel'];
+    final payload = response['post'];
     if (payload is Map<String, dynamic>) {
       return ReelModel.fromJson(payload);
     }
@@ -53,32 +54,31 @@ class ReelsRepositoryImpl implements ReelsRepository {
     int? durationSeconds,
   }) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
-      '/reels',
+      '/posts',
       data: {
-        'videoUrl': videoUrl,
-        'caption': caption,
-        if (durationSeconds != null) 'durationSeconds': durationSeconds,
+        'content': caption,
+        'mediaUrls': [videoUrl],
       },
       decode: _asMap,
     );
 
-    final reel = response['reel'];
-    if (reel is Map<String, dynamic>) {
-      return ReelModel.fromJson(reel);
+    final post = response['post'];
+    if (post is Map<String, dynamic>) {
+      return ReelModel.fromJson(post);
     }
 
-    throw const FormatException('Response missing reel.');
+    throw const FormatException('Response missing post.');
   }
 
   @override
   Future<ReelReactionResult> likeReel(String reelId) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
-      '/reels/$reelId/like',
+      '/posts/$reelId/like',
       decode: _asMap,
     );
 
     return ReelReactionResult(
-      reelId: response['reelId'] as String? ?? reelId,
+      reelId: response['reelId'] as String? ?? response['postId'] as String? ?? reelId,
       likeCount: response['likeCount'] as int? ?? 0,
       isLiked: response['isLiked'] as bool? ?? false,
     );
@@ -87,12 +87,12 @@ class ReelsRepositoryImpl implements ReelsRepository {
   @override
   Future<ReelReactionResult> unlikeReel(String reelId) async {
     final response = await _apiClient.delete<Map<String, dynamic>>(
-      '/reels/$reelId/like',
+      '/posts/$reelId/like',
       decode: _asMap,
     );
 
     return ReelReactionResult(
-      reelId: response['reelId'] as String? ?? reelId,
+      reelId: response['reelId'] as String? ?? response['postId'] as String? ?? reelId,
       likeCount: response['likeCount'] as int? ?? 0,
       isLiked: response['isLiked'] as bool? ?? false,
     );
@@ -101,7 +101,7 @@ class ReelsRepositoryImpl implements ReelsRepository {
   @override
   Future<void> deleteReel(String reelId) async {
     await _apiClient.delete<Map<String, dynamic>>(
-      '/reels/$reelId',
+      '/posts/$reelId',
       decode: _asMap,
     );
   }
@@ -109,7 +109,7 @@ class ReelsRepositoryImpl implements ReelsRepository {
   @override
   Future<List<ReelComment>> getComments(String reelId) async {
     final response = await _apiClient.get<Map<String, dynamic>>(
-      '/reels/$reelId/comments',
+      '/posts/$reelId/replies',
       decode: _asMap,
     );
 
@@ -130,17 +130,20 @@ class ReelsRepositoryImpl implements ReelsRepository {
     required String content,
   }) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
-      '/reels/$reelId/comments',
-      data: {'content': content},
+      '/posts/$reelId/replies',
+      data: {
+        'content': content,
+        'mediaUrls': const <String>[],
+      },
       decode: _asMap,
     );
 
-    final comment = response['comment'];
+    final comment = response['comment'] ?? response['reply'];
     if (comment is Map<String, dynamic>) {
       return ReelCommentModel.fromJson(comment);
     }
 
-    throw const FormatException('Response missing reel comment.');
+    throw const FormatException('Response missing reply.');
   }
 
   static Map<String, dynamic> _asMap(Object? value) {
@@ -149,5 +152,33 @@ class ReelsRepositoryImpl implements ReelsRepository {
     }
 
     throw const FormatException('Expected a JSON object.');
+  }
+
+  static bool _hasVideoMedia(Map<String, dynamic> json) {
+    final directVideoUrl = json['videoUrl'] as String?;
+    if (directVideoUrl != null && directVideoUrl.isNotEmpty) {
+      return true;
+    }
+
+    final mediaUrls = json['mediaUrls'];
+    if (mediaUrls is! List) {
+      return false;
+    }
+
+    for (final mediaUrl in mediaUrls.whereType<String>()) {
+      if (_looksLikeVideoUrl(mediaUrl)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  static bool _looksLikeVideoUrl(String url) {
+    final normalized = url.toLowerCase().split('?').first;
+    return normalized.endsWith('.mp4') ||
+        normalized.endsWith('.mov') ||
+        normalized.endsWith('.webm') ||
+        normalized.endsWith('.m4v');
   }
 }

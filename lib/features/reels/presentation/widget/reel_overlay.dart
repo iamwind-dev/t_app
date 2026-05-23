@@ -30,7 +30,7 @@ class ReelOverlay extends StatelessWidget {
       children: [
         _topTitle(topInset),
         _rightActions(context),
-        _bottomInfo(),
+        _bottomInfo(context),
       ],
     );
   }
@@ -57,14 +57,16 @@ class ReelOverlay extends StatelessWidget {
       child: Column(
         children: [
           ReelActionButton(
-            icon: reel.isLiked ? Icons.favorite : Icons.favorite_border,
-            label: _formatNumber(reel.likes),
-            color: reel.isLiked ? Colors.red : Colors.white,
+            iconAssetPath: 'assets/icons/heart.png',
+            activeIconAssetPath: 'assets/icons/heartred.png',
+            label: '${reel.likes}',
+            enableLikeToggle: true,
+            initiallyLiked: reel.isLiked,
             onTap: onLike,
           ),
           ReelActionButton(
-            icon: Icons.mode_comment_outlined,
-            label: _formatNumber(reel.comments),
+            iconAssetPath: 'assets/icons/message.png',
+            label: '${reel.comments}',
             onTap: () {
               showModalBottomSheet<void>(
                 context: context,
@@ -99,8 +101,8 @@ class ReelOverlay extends StatelessWidget {
             },
           ),
           ReelActionButton(
-            icon: Icons.send_outlined,
-            label: 'Share',
+            iconAssetPath: 'assets/icons/send.png',
+            label: '',
             onTap: () => showShareReelSheet(context, reel: reel),
           ),
           ReelActionButton(
@@ -108,21 +110,27 @@ class ReelOverlay extends StatelessWidget {
             label: '',
             onTap: () => _showReelActions(context),
           ),
-          const SizedBox(height: 10),
-          CircleAvatar(
-            radius: 18,
-            backgroundImage:
-                reel.avatarUrl != null ? NetworkImage(reel.avatarUrl!) : null,
-            child: reel.avatarUrl == null
-                ? const Icon(Icons.person, size: 18)
-                : null,
-          ),
+          // const SizedBox(height: 10),
+          // CircleAvatar(
+          //   radius: 18,
+          //   backgroundImage:
+          //       reel.avatarUrl != null ? NetworkImage(reel.avatarUrl!) : null,
+          //   child: reel.avatarUrl == null
+          //       ? const Icon(Icons.person, size: 18)
+          //       : null,
+          // ),
         ],
       ),
     );
   }
 
-  Widget _bottomInfo() {
+  Widget _bottomInfo(BuildContext context) {
+    final currentUserId = context.read<AuthCubit>().state.user?.id;
+    final shouldShowFollowButton =
+        currentUserId != null &&
+        currentUserId != reel.authorId &&
+        !reel.isFollowing;
+
     return Positioned(
       left: 16,
       right: 80,
@@ -149,24 +157,26 @@ class ReelOverlay extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text(
-                  'Follow',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
+              if (shouldShowFollowButton) ...[
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.white),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'Follow',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
           const SizedBox(height: 12),
@@ -303,17 +313,5 @@ class ReelOverlay extends StatelessWidget {
         const SnackBar(content: Text('Cannot delete reel right now.')),
       );
     }
-  }
-
-  String _formatNumber(int value) {
-    if (value >= 1000000) {
-      return '${(value / 1000000).toStringAsFixed(1)}M';
-    }
-
-    if (value >= 1000) {
-      return '${(value / 1000).toStringAsFixed(1)}K';
-    }
-
-    return value.toString();
   }
 }

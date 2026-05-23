@@ -105,6 +105,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
       child: BlocBuilder<ChatThreadCubit, ChatThreadState>(
         builder: (context, state) {
           return Scaffold(
+            resizeToAvoidBottomInset: true,
             backgroundColor: ChatThreadTokens.pageBackground(context),
             body: SafeArea(
               bottom: false,
@@ -733,6 +734,12 @@ class _MessageComposerState extends State<_MessageComposer> {
     super.initState();
     _controller = TextEditingController();
     _focusNode = FocusNode()..addListener(_handleFocusChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _focusNode.requestFocus();
+    });
   }
 
   @override
@@ -789,9 +796,15 @@ class _MessageComposerState extends State<_MessageComposer> {
 
   @override
   Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+
     return ColoredBox(
       color: ChatThreadTokens.pageBackground(context),
-      child: SafeArea(
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.only(bottom: keyboardInset),
+        child: SafeArea(
         top: false,
         child: SizedBox(
           height: ChatThreadTokens.composerHeight,
@@ -815,6 +828,7 @@ class _MessageComposerState extends State<_MessageComposer> {
                     child: TextField(
                       controller: _controller,
                       focusNode: _focusNode,
+                      autofocus: true,
                       minLines: 1,
                       maxLines: 3,
                       textInputAction: TextInputAction.send,
@@ -846,6 +860,7 @@ class _MessageComposerState extends State<_MessageComposer> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

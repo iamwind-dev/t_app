@@ -236,13 +236,13 @@ class ThreadModerationChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = moderationColor(
       context,
-      action: thread.moderationAction,
-      label: thread.moderationLabel,
+      action: thread.effectiveModerationAction,
+      label: thread.effectiveModerationLabel,
     );
     final colorScheme = Theme.of(context).colorScheme;
-    final label = thread.moderationAction == 'WARN_USER'
+    final label = thread.effectiveModerationAction == 'WARN_USER'
         ? 'Canh bao'
-        : moderationLabelText(thread.moderationLabel);
+        : moderationLabelText(thread.effectiveModerationLabel);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -257,7 +257,7 @@ class ThreadModerationChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            moderationIcon(thread.moderationAction),
+            moderationIcon(thread.effectiveModerationAction),
             size: 14,
             color: accent,
           ),
@@ -269,7 +269,7 @@ class ThreadModerationChip extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-          if (thread.moderationAction == 'BLOCK_OR_REVIEW') ...[
+          if (thread.effectiveModerationAction == 'BLOCK_OR_REVIEW') ...[
             const SizedBox(width: 6),
             Text(
               'Dang review',

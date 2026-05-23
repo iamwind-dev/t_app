@@ -8,6 +8,10 @@ class ThreadApiMapper {
 
   static ThreadItemModel postFromJson(Map<String, dynamic> json) {
     final id = json['id'] as String;
+    final previewReplies = _replyListFromJson(
+      json['previewReplies'] ?? json['replies'] ?? json['children'],
+    );
+
     return ThreadItemModel(
       id: id,
       rootThreadId: id,
@@ -24,6 +28,8 @@ class ThreadApiMapper {
       moderationAction: json['moderationAction'] as String? ?? 'ALLOW',
       moderationIsWarning: json['moderationIsWarning'] as bool? ?? false,
       visibilityLevel: json['visibilityLevel'] as String? ?? 'normal',
+      previewReplies: previewReplies,
+      children: previewReplies,
     );
   }
 
@@ -48,6 +54,10 @@ class ThreadApiMapper {
       moderationAction: json['moderationAction'] as String? ?? 'ALLOW',
       moderationIsWarning: json['moderationIsWarning'] as bool? ?? false,
       visibilityLevel: json['visibilityLevel'] as String? ?? 'normal',
+      previewReplies: _replyListFromJson(
+        json['previewReplies'] ?? json['replies'] ?? json['children'],
+      ),
+      children: _replyListFromJson(json['children']),
     );
   }
 
@@ -67,6 +77,7 @@ class ThreadApiMapper {
       avatarUrl: BackendUrlNormalizer.normalizeNullable(
         rawAvatarUrl as String?,
       ),
+      isFollowing: json['isFollowing'] as bool? ?? false,
     );
   }
 
@@ -78,6 +89,17 @@ class ThreadApiMapper {
     return value
         .whereType<String>()
         .map(BackendUrlNormalizer.normalize)
+        .toList(growable: false);
+  }
+
+  static List<ThreadItemModel> _replyListFromJson(Object? value) {
+    if (value is! List) {
+      return const [];
+    }
+
+    return value
+        .whereType<Map<String, dynamic>>()
+        .map(replyFromJson)
         .toList(growable: false);
   }
 

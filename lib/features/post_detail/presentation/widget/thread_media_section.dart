@@ -6,7 +6,7 @@ class ThreadMediaSection extends StatefulWidget {
 
   final List<String> imageUrls;
 
-  static const double singleImageHeight = 240;
+  static const double singleImageMaxHeight = 420;
   static const double multiImageHeight = 220;
   static const double multiImageGap = 12;
   static const double indicatorSpacing = 10;
@@ -19,7 +19,7 @@ class ThreadMediaSection extends StatefulWidget {
     }
 
     if (count == 1) {
-      return singleImageHeight;
+      return singleImageMaxHeight;
     }
 
     return multiImageHeight + indicatorSpacing + indicatorHeight;
@@ -52,9 +52,9 @@ class _ThreadMediaSectionState extends State<ThreadMediaSection> {
     }
 
     if (widget.imageUrls.length == 1) {
-      return _MediaCard(
+      return _AdaptiveMediaCard(
         mediaUrl: widget.imageUrls.first,
-        height: ThreadMediaSection.singleImageHeight,
+        maxHeight: ThreadMediaSection.singleImageMaxHeight,
       );
     }
 
@@ -82,7 +82,7 @@ class _ThreadMediaSectionState extends State<ThreadMediaSection> {
                       ? 0
                       : ThreadMediaSection.multiImageGap,
                 ),
-                child: _MediaCard(
+                child: _FixedHeightMediaCard(
                   mediaUrl: widget.imageUrls[index],
                   height: ThreadMediaSection.multiImageHeight,
                 ),
@@ -96,8 +96,8 @@ class _ThreadMediaSectionState extends State<ThreadMediaSection> {
   }
 }
 
-class _MediaCard extends StatelessWidget {
-  const _MediaCard({required this.mediaUrl, this.height});
+class _FixedHeightMediaCard extends StatelessWidget {
+  const _FixedHeightMediaCard({required this.mediaUrl, this.height});
 
   final String mediaUrl;
   final double? height;
@@ -115,10 +115,109 @@ class _MediaCard extends StatelessWidget {
   }
 }
 
+class _AdaptiveMediaCard extends StatefulWidget {
+  const _AdaptiveMediaCard({
+    required this.mediaUrl,
+    required this.maxHeight,
+  });
+
+  final String mediaUrl;
+  final double maxHeight;
+
+  @override
+  State<_AdaptiveMediaCard> createState() => _AdaptiveMediaCardState();
+}
+
+class _AdaptiveMediaCardState extends State<_AdaptiveMediaCard> {
+  ImageStream? _imageStream;
+  ImageStreamListener? _listener;
+  double? _aspectRatio;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveImage();
+  }
+
+  @override
+  void didUpdateWidget(covariant _AdaptiveMediaCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.mediaUrl != widget.mediaUrl) {
+      _removeListener();
+      _aspectRatio = null;
+      _resolveImage();
+    }
+  }
+
+  @override
+  void dispose() {
+    _removeListener();
+    super.dispose();
+  }
+
+  void _resolveImage() {
+    final provider = _MediaSurface._imageProvider(widget.mediaUrl);
+    final stream = provider.resolve(const ImageConfiguration());
+    final listener = ImageStreamListener(
+      (image, _) {
+        if (!mounted) {
+          return;
+        }
+
+        final width = image.image.width.toDouble();
+        final height = image.image.height.toDouble();
+        if (width <= 0 || height <= 0) {
+          return;
+        }
+
+        setState(() {
+          _aspectRatio = width / height;
+        });
+      },
+    );
+
+    _imageStream = stream;
+    _listener = listener;
+    stream.addListener(listener);
+  }
+
+  void _removeListener() {
+    final stream = _imageStream;
+    final listener = _listener;
+    if (stream != null && listener != null) {
+      stream.removeListener(listener);
+    }
+    _imageStream = null;
+    _listener = null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: widget.maxHeight),
+        child: AspectRatio(
+          aspectRatio: _aspectRatio ?? 1,
+          child: _MediaSurface(path: widget.mediaUrl),
+        ),
+      ),
+    );
+  }
+}
+
 class _MediaSurface extends StatelessWidget {
   const _MediaSurface({required this.path});
 
   final String path;
+
+  static ImageProvider _imageProvider(String path) {
+    if (_isRemotePath(path)) {
+      return NetworkImage(path);
+    }
+
+    return AssetImage(path);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -137,10 +236,21 @@ class _MediaImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     if (_isRemotePath(path)) {
       return Image.network(
         path,
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
+        alignment: Alignment.center,
+        width: double.infinity,
+        height: double.infinity,
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+          return ColoredBox(
+            color: colorScheme.surfaceContainerLow,
+            child: child,
+          );
+        },
         errorBuilder: (context, error, stackTrace) {
           return const _MediaErrorPlaceholder(
             icon: Icons.broken_image_outlined,
@@ -150,7 +260,16 @@ class _MediaImage extends StatelessWidget {
       );
     }
 
-    return Image.asset(path, fit: BoxFit.cover);
+    return ColoredBox(
+      color: colorScheme.surfaceContainerLow,
+      child: Image.asset(
+        path,
+        fit: BoxFit.contain,
+        alignment: Alignment.center,
+        width: double.infinity,
+        height: double.infinity,
+      ),
+    );
   }
 }
 

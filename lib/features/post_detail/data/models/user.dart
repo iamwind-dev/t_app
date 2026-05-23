@@ -9,6 +9,7 @@ class User extends Equatable {
     this.avatarUrl,
     this.subtitle,
     this.isVerified = false,
+    this.isFollowing = false,
   });
 
   final String id;
@@ -18,6 +19,7 @@ class User extends Equatable {
   final String? avatarUrl;
   final String? subtitle;
   final bool isVerified;
+  final bool isFollowing;
 
   User copyWith({
     String? id,
@@ -27,6 +29,7 @@ class User extends Equatable {
     String? avatarUrl,
     String? subtitle,
     bool? isVerified,
+    bool? isFollowing,
   }) {
     return User(
       id: id ?? this.id,
@@ -36,6 +39,7 @@ class User extends Equatable {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       subtitle: subtitle ?? this.subtitle,
       isVerified: isVerified ?? this.isVerified,
+      isFollowing: isFollowing ?? this.isFollowing,
     );
   }
 
@@ -48,5 +52,6 @@ class User extends Equatable {
     avatarUrl,
     subtitle,
     isVerified,
+    isFollowing,
   ];
 }
