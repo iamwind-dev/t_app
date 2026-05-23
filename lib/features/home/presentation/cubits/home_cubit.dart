@@ -1,293 +1,471 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:t_app/core/config/app_config.dart';
+import 'package:t_app/core/network/api_exception.dart';
+import 'package:t_app/core/realtime/realtime_event_bus.dart';
+import 'package:t_app/core/utils/time_formatter.dart';
+import 'package:t_app/features/post_detail/data/mock_thread_repository.dart';
+import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
+import 'package:t_app/features/post_detail/data/models/user.dart';
+import 'package:t_app/features/posts/data/moderated_thread_submission.dart';
+import 'package:t_app/features/posts/data/moderation_result.dart';
+import 'package:t_app/features/posts/data/thread_api_mapper.dart';
+import 'package:t_app/features/posts/domain/posts_feed_repository.dart';
 
 import 'home_state.dart';
 
 class HomeCubit extends Cubit<HomeState> {
-  HomeCubit() : super(const HomeState()) {
-    loadHomeFeed();
+  HomeCubit({required PostsFeedRepository repository})
+      : _repository = repository,
+        super(const HomeState()) {
+    _realtimeSubscription = RealtimeEventBus.instance.stream.listen(
+      _handleRealtimeEvent,
+    );
   }
 
-  void loadHomeFeed() {
+  final PostsFeedRepository _repository;
+  late final StreamSubscription<RealtimeAppEvent> _realtimeSubscription;
+
+  Future<void> loadHomeFeed() async {
+    if (AppConfig.uiPreviewMode) {
+      emit(
+        state.copyWith(
+          status: HomeFeedStatus.loaded,
+          rootThreads: const MockThreadRepository().fetchRootThreads(),
+          lastLoadedAtEpochMs: DateTime.now().millisecondsSinceEpoch,
+          clearError: true,
+          hasMore: false,
+          isLoadingMore: false,
+          clearCursor: true,
+        ),
+      );
+      return;
+    }
+
     emit(
       state.copyWith(
-        posts: const [
-          ThreadPost(
-            author: 'Ruchi_shah',
-            timeAgo: '49m',
-            content:
-                'Failures are stepping stones to success.\nEmbrace them, learn from them, and keep moving forward',
-            threadStackAsset: 'assets/images/home_thread_stack_1.png',
-            threadStackHeight: 147,
-            likeCount: '3',
-            replyCount: '1',
-            repostCount: '0',
-            sendCount: '0',
-            comments: [
-              ThreadComment(
-                author: 'nhuxinhnaa',
-                timeAgo: '23 giờ',
-                content: 'giọng Huế nghe hayyyyy vãi',
-                showLikeBadge: true,
-                likeCount: '5',
-                replyCount: '0',
-                repostCount: '0',
-                sendCount: '0',
-              ),
-            ],
-            primaryMeta: '1 like',
+        status: HomeFeedStatus.loading,
+        clearError: true,
+        isLoadingMore: false,
+        hasMore: true,
+        clearCursor: true,
+      ),
+    );
+
+    try {
+      final page = await _repository.getFeed(limit: 10);
+
+      emit(
+        state.copyWith(
+          status: HomeFeedStatus.loaded,
+          rootThreads: page.items,
+          nextCursor: page.pageInfo.nextCursor,
+          hasMore: page.pageInfo.hasNextPage,
+          lastLoadedAtEpochMs: DateTime.now().millisecondsSinceEpoch,
+          clearError: true,
+        ),
+      );
+    } on ApiException catch (error) {
+      emit(
+        state.copyWith(
+          status: HomeFeedStatus.failure,
+          errorMessage: error.message,
+        ),
+      );
+    } catch (_) {
+      emit(
+        state.copyWith(
+          status: HomeFeedStatus.failure,
+          errorMessage: 'Không thể tải bảng tin.',
+        ),
+      );
+    }
+  }
+
+  Future<bool> refreshFeed({bool isFromPostCreation = false}) async {
+    if (state.isRefreshing) {
+      return false;
+    }
+
+    emit(
+      state.copyWith(
+        isRefreshing: true,
+        clearError: true,
+      ),
+    );
+
+    try {
+      if (AppConfig.uiPreviewMode) {
+        emit(
+          state.copyWith(
+            status: HomeFeedStatus.loaded,
+            rootThreads: const MockThreadRepository().fetchRootThreads(),
+            lastLoadedAtEpochMs: DateTime.now().millisecondsSinceEpoch,
+            clearError: true,
+            hasMore: false,
+            isLoadingMore: false,
+            clearCursor: true,
+            isRefreshing: false,
           ),
-          ThreadPost(
-            author: 'Payal_shah',
-            timeAgo: '44m',
-            content: 'Yes',
-            threadStackAsset: 'assets/images/home_thread_stack_2.png',
-            threadStackHeight: 106,
-            likeCount: '6',
-            replyCount: '3',
-            repostCount: '2',
-            sendCount: '1',
-            primaryMeta: '1 like',
-          ),
-          ThreadPost(
-            author: 'Krunal modi',
-            timeAgo: '50m',
-            content: 'Hey @zuck where is my verified?',
-            threadStackAsset: 'assets/images/home_thread_stack_2.png',
-            threadStackHeight: 106,
-            likeCount: '10.7k',
-            replyCount: '546',
-            repostCount: '19',
-            sendCount: '11',
-            postImageAsset: 'assets/images/home_post_sample.jpg',
-            postImageHeight: 220,
-            primaryMeta: '2 replies',
-            secondaryMeta: 'People liked your content',
-          ),
-          ThreadPost(
-            author: 'figma',
-            timeAgo: '6m',
-            content: 'Hello new (old) friends ✌️',
-            threadStackAsset: 'assets/images/home_thread_stack_3.png',
-            threadStackHeight: 40,
-            likeCount: '32k',
-            replyCount: '1.2k',
-            repostCount: '320',
-            sendCount: '48',
-            isVerified: true,
-            primaryMeta: '32k replies',
-            secondaryMeta: 'Liked by cursodefigmapro and others',
-          ),
-          ThreadPost(
-            author: 'DesignDaily',
-            timeAgo: '12m',
-            content:
-                'Daily tip: keep spacing consistent with an 8pt grid. Your UI instantly feels cleaner.',
-            threadStackAsset: 'assets/images/home_thread_stack_1.png',
-            threadStackHeight: 154,
-            likeCount: '128',
-            replyCount: '14',
-            repostCount: '5',
-            sendCount: '3',
-            comments: [
-              ThreadComment(
-                author: 'pixel_anna',
-                timeAgo: '9m',
-                content: '8pt grid is a game changer for handoff.',
-                likeCount: '8',
-                replyCount: '1',
-                repostCount: '0',
-                sendCount: '0',
-              ),
-            ],
-            primaryMeta: '14 replies',
-          ),
-          ThreadPost(
-            author: 'FlutterNerd',
-            timeAgo: '19m',
-            content:
-                'Built a sticky bottom nav with scroll-aware animation today. Super smooth now 🚀',
-            threadStackAsset: 'assets/images/home_thread_stack_2.png',
-            threadStackHeight: 106,
-            likeCount: '2.4k',
-            replyCount: '197',
-            repostCount: '63',
-            sendCount: '24',
-            postImageAsset: 'assets/images/home_post_sample.jpg',
-            postImageHeight: 210,
-            primaryMeta: 'Trending in Mobile Dev',
-          ),
-          ThreadPost(
-            author: 'TheProductClub',
-            timeAgo: '34m',
-            content:
-                'Question for everyone: what is one habit that made your product thinking better?',
-            threadStackAsset: 'assets/images/home_thread_stack_3.png',
-            threadStackHeight: 148,
-            likeCount: '402',
-            replyCount: '81',
-            repostCount: '11',
-            sendCount: '7',
-            comments: [
-              ThreadComment(
-                author: 'james_pm',
-                timeAgo: '30m',
-                content: 'Talking to users every single week.',
-                showLikeBadge: true,
-                likeCount: '21',
-                replyCount: '4',
-                repostCount: '1',
-                sendCount: '0',
-              ),
-              ThreadComment(
-                author: 'linhux',
-                timeAgo: '25m',
-                content: 'Writing assumptions before building any feature.',
-                likeCount: '13',
-                replyCount: '2',
-                repostCount: '0',
-                sendCount: '0',
-              ),
-            ],
-            primaryMeta: '81 replies',
-            secondaryMeta: 'People are discussing this',
-          ),
-          ThreadPost(
-            author: 'open_source',
-            timeAgo: '1h',
-            content:
-                'Shipped another tiny improvement today. Small wins every day compound over time.',
-            threadStackAsset: 'assets/images/home_thread_stack_2.png',
-            threadStackHeight: 106,
-            likeCount: '98',
-            replyCount: '12',
-            repostCount: '4',
-            sendCount: '2',
-            isVerified: true,
-            primaryMeta: '12 replies',
-          ),
-          ThreadPost(
-            author: 'CafeCodeVN',
-            timeAgo: '1h',
-            content:
-                'Sang nay ngoi debug tu 7h, cuoi cung loi lai den tu 1 dau phay sai. Lam dev la vay do.',
-            threadStackAsset: 'assets/images/home_thread_stack_1.png',
-            threadStackHeight: 154,
-            likeCount: '286',
-            replyCount: '42',
-            repostCount: '7',
-            sendCount: '4',
-            comments: [
-              ThreadComment(
-                author: 'duypham',
-                timeAgo: '58m',
-                content: 'Bug nho nhat thuong an nhieu thoi gian nhat.',
-                likeCount: '11',
-                replyCount: '2',
-                repostCount: '0',
-                sendCount: '0',
-              ),
-            ],
-            primaryMeta: '42 replies',
-            secondaryMeta: 'Developers can relate',
-          ),
-          ThreadPost(
-            author: 'makerspace',
-            timeAgo: '1h',
-            content:
-                'Prototype nhanh khong co nghia la lam au. Chi can dung muc do chi tiet de test dung gia thuyet.',
-            threadStackAsset: 'assets/images/home_thread_stack_3.png',
-            threadStackHeight: 148,
-            likeCount: '1.8k',
-            replyCount: '125',
-            repostCount: '33',
-            sendCount: '12',
-            comments: [
-              ThreadComment(
-                author: 'linh.product',
-                timeAgo: '55m',
-                content:
-                    'Dung, prototype tot la prototype tra loi duoc cau hoi lon nhat.',
-                showLikeBadge: true,
-                likeCount: '17',
-                replyCount: '3',
-                repostCount: '1',
-                sendCount: '0',
-              ),
-              ThreadComment(
-                author: 'hieutran',
-                timeAgo: '48m',
-                content:
-                    'Team minh giam duoc kha nhieu scope creep sau khi lam theo cach nay.',
-                likeCount: '9',
-                replyCount: '1',
-                repostCount: '0',
-                sendCount: '0',
-              ),
-            ],
-            primaryMeta: '125 replies',
-          ),
-          ThreadPost(
-            author: 'photo.walks',
-            timeAgo: '2h',
-            content:
-                'Golden hour in Sai Gon hits different when the streets slow down for five minutes.',
-            threadStackAsset: 'assets/images/home_thread_stack_2.png',
-            threadStackHeight: 106,
-            likeCount: '5.1k',
-            replyCount: '302',
-            repostCount: '57',
-            sendCount: '18',
-            postImageAsset: 'assets/images/home_post_sample.jpg',
-            postImageHeight: 236,
-            primaryMeta: '302 replies',
-            secondaryMeta: 'Popular in Photography',
-          ),
-          ThreadPost(
-            author: 'buildinpublic',
-            timeAgo: '2h',
-            content:
-                'Posting this here so I stay accountable: ship the onboarding flow before midnight.',
-            threadStackAsset: 'assets/images/home_thread_stack_2.png',
-            threadStackHeight: 106,
-            likeCount: '742',
-            replyCount: '58',
-            repostCount: '9',
-            sendCount: '6',
-            isVerified: true,
-            primaryMeta: '58 replies',
-          ),
-          ThreadPost(
-            author: 'ux.notes',
-            timeAgo: '3h',
-            content:
-                'Neu user phai dung lai de nghi xem nut nay dung de lam gi, thi do khong con la UI "truc quan" nua.',
-            threadStackAsset: 'assets/images/home_thread_stack_1.png',
-            threadStackHeight: 154,
-            likeCount: '963',
-            replyCount: '76',
-            repostCount: '21',
-            sendCount: '10',
-            comments: [
-              ThreadComment(
-                author: 'quangui',
-                timeAgo: '2h',
-                content:
-                    'Text tren button va hierarchy van la hai thu bi lam au nhat.',
-                likeCount: '14',
-                replyCount: '2',
-                repostCount: '0',
-                sendCount: '0',
-              ),
-            ],
-            primaryMeta: '76 replies',
-            secondaryMeta: 'Saved by 200+ designers',
-          ),
+        );
+        return true;
+      }
+
+      final page = await _repository.getFeed(limit: 10);
+
+      emit(
+        state.copyWith(
+          status: HomeFeedStatus.loaded,
+          rootThreads: page.items,
+          nextCursor: page.pageInfo.nextCursor,
+          hasMore: page.pageInfo.hasNextPage,
+          lastLoadedAtEpochMs: DateTime.now().millisecondsSinceEpoch,
+          clearError: true,
+          isRefreshing: false,
+        ),
+      );
+      return true;
+    } on ApiException catch (error) {
+      emit(
+        state.copyWith(
+          isRefreshing: false,
+          errorMessage: isFromPostCreation
+              ? 'Đã đăng bài, nhưng chưa thể tải lại bảng tin'
+              : error.message,
+        ),
+      );
+      return false;
+    } catch (_) {
+      emit(
+        state.copyWith(
+          isRefreshing: false,
+          errorMessage: isFromPostCreation
+              ? 'Đã đăng bài, nhưng chưa thể tải lại bảng tin'
+              : 'Không thể tải lại bảng tin.',
+        ),
+      );
+      return false;
+    }
+  }
+
+  void clearError() {
+    emit(state.copyWith(clearError: true));
+  }
+
+  Future<void> loadMoreHomeFeed() async {
+    if (state.isLoadingMore ||
+        !state.hasMore ||
+        state.status == HomeFeedStatus.loading ||
+        AppConfig.uiPreviewMode) {
+      return;
+    }
+
+    emit(
+      state.copyWith(
+        isLoadingMore: true,
+        clearError: true,
+      ),
+    );
+
+    try {
+      final page = await _repository.getFeed(
+        limit: 10,
+        cursor: state.nextCursor,
+      );
+
+      final existingIds = state.rootThreads.map((e) => e.id).toSet();
+      final uniqueIncoming = page.items
+          .where((item) => !existingIds.contains(item.id))
+          .toList(growable: false);
+
+      emit(
+        state.copyWith(
+          status: HomeFeedStatus.loaded,
+          rootThreads: [
+            ...state.rootThreads,
+            ...uniqueIncoming,
+          ],
+          nextCursor: page.pageInfo.nextCursor,
+          hasMore: page.pageInfo.hasNextPage,
+          isLoadingMore: false,
+          clearError: true,
+        ),
+      );
+    } on ApiException catch (error) {
+      emit(
+        state.copyWith(
+          isLoadingMore: false,
+          errorMessage: error.message,
+        ),
+      );
+    } catch (_) {
+      emit(
+        state.copyWith(
+          isLoadingMore: false,
+          errorMessage: 'Không thể tải thêm bài viết.',
+        ),
+      );
+    }
+  }
+
+  /// Creates a post and returns moderation so the composer can decide UX first.
+  Future<ModeratedThreadSubmission> createPost(
+    String content, {
+    List<String> mediaUrls = const <String>[],
+  }) async {
+    if (AppConfig.uiPreviewMode) {
+      final trimmed = content.trim();
+      if (trimmed.isEmpty) {
+        return const ModeratedThreadSubmission();
+      }
+
+      final postId = 'preview_post_${DateTime.now().microsecondsSinceEpoch}';
+      final post = ThreadItemModel(
+        id: postId,
+        rootThreadId: postId,
+        author: const User(
+          id: 'demo_user',
+          name: 'Thaii Duong',
+          username: '__win.d',
+          avatarAssetPath: 'assets/images/home_avatar_payal.png',
+        ),
+        createdAt: TimeFormatter.formatSocialTime(DateTime.now()),
+        content: trimmed,
+        imageUrls: mediaUrls,
+      );
+
+      return ModeratedThreadSubmission(
+        thread: post,
+        moderation: const ModerationResult(
+          text: '',
+          finalLabel: 'clean',
+          finalConfidence: 0,
+          isWarning: false,
+          action: 'ALLOW',
+          layers: <ModerationLayerResult>[],
+          status: 'APPROVED',
+          model: '',
+        ),
+      );
+    }
+
+    return _repository.createPost(
+      content: content,
+      mediaUrls: mediaUrls,
+    );
+  }
+
+  /// Inserts an accepted post into the feed after moderation UX completes.
+  void insertCreatedPost(ThreadItemModel post) {
+    final alreadyExists = state.rootThreads.any((item) => item.id == post.id);
+    if (alreadyExists) {
+      return;
+    }
+
+    emit(
+      state.copyWith(
+        status: HomeFeedStatus.loaded,
+        rootThreads: [
+          post,
+          ...state.rootThreads,
         ],
+        clearError: true,
+      ),
+    );
+  }
+
+  Future<void> togglePostLike(ThreadItemModel post) async {
+    if (AppConfig.uiPreviewMode) {
+      emit(
+        state.copyWith(
+          rootThreads: _replaceThread(
+            state.rootThreads,
+            post.id,
+            (thread) => thread.copyWith(
+              likesCount: thread.isLikedByMe
+                  ? (thread.likesCount > 0 ? thread.likesCount - 1 : 0)
+                  : thread.likesCount + 1,
+              isLikedByMe: !thread.isLikedByMe,
+            ),
+          ),
+          clearError: true,
+        ),
+      );
+      return;
+    }
+
+    final result = post.isLikedByMe
+        ? await _repository.unlikePost(post.id)
+        : await _repository.likePost(post.id);
+
+    emit(
+      state.copyWith(
+        rootThreads: _replaceThread(
+          state.rootThreads,
+          result.targetId,
+          (thread) => thread.copyWith(
+            likesCount: result.likeCount,
+            isLikedByMe: result.isLiked,
+          ),
+        ),
       ),
     );
   }
 
   void changeTab(int index) {
     emit(state.copyWith(selectedTabIndex: index));
+  }
+
+  void _handleRealtimeEvent(RealtimeAppEvent event) {
+    if (event.type == 'post.created') {
+      _handlePostCreated(event.payload);
+      return;
+    }
+
+    if (event.type != 'user.profile.updated') {
+      return;
+    }
+
+    final userId = event.payload['userId'] as String?;
+    if (userId == null || userId.isEmpty) {
+      return;
+    }
+
+    final displayName = event.payload['displayName'] as String?;
+    final username = event.payload['username'] as String?;
+    final avatarUrl = event.payload['avatarUrl'] as String?;
+
+    emit(
+      state.copyWith(
+        rootThreads: state.rootThreads
+            .map(
+              (thread) => _patchThreadAuthor(
+                thread,
+                userId: userId,
+                displayName: displayName,
+                username: username,
+                avatarUrl: avatarUrl,
+              ),
+            )
+            .toList(growable: false),
+      ),
+    );
+  }
+
+  void _handlePostCreated(Map<String, dynamic> payload) {
+    final postJson = payload['post'];
+    final map = postJson is Map<String, dynamic>
+        ? postJson
+        : (payload['data'] is Map<String, dynamic>
+            ? payload['data'] as Map<String, dynamic>
+            : payload);
+
+    if (map['id'] is! String) {
+      return;
+    }
+
+    try {
+      final post = ThreadApiMapper.postFromJson(map);
+      final alreadyExists = state.rootThreads.any((item) => item.id == post.id);
+      if (alreadyExists) {
+        return;
+      }
+
+      emit(
+        state.copyWith(
+          rootThreads: [
+            post,
+            ...state.rootThreads,
+          ],
+          lastLoadedAtEpochMs: DateTime.now().millisecondsSinceEpoch,
+        ),
+      );
+    } catch (_) {
+      // Ignore malformed realtime payloads and keep current feed state.
+    }
+  }
+
+  Future<void> syncIfStale({
+    Duration maxAge = const Duration(minutes: 2),
+  }) async {
+    final lastLoadedAt = state.lastLoadedAtEpochMs;
+    if (lastLoadedAt == null) {
+      await loadHomeFeed();
+      return;
+    }
+
+    final elapsed = DateTime.now().millisecondsSinceEpoch - lastLoadedAt;
+    if (elapsed >= maxAge.inMilliseconds) {
+      await loadHomeFeed();
+    }
+  }
+
+  ThreadItemModel _patchThreadAuthor(
+    ThreadItemModel thread, {
+    required String userId,
+    String? displayName,
+    String? username,
+    String? avatarUrl,
+  }) {
+    final nextChildren = thread.children
+        .map(
+          (child) => _patchThreadAuthor(
+            child,
+            userId: userId,
+            displayName: displayName,
+            username: username,
+            avatarUrl: avatarUrl,
+          ),
+        )
+        .toList(growable: false);
+
+    final nextPreviews = thread.previewReplies
+        .map(
+          (child) => _patchThreadAuthor(
+            child,
+            userId: userId,
+            displayName: displayName,
+            username: username,
+            avatarUrl: avatarUrl,
+          ),
+        )
+        .toList(growable: false);
+
+    if (thread.author.id != userId) {
+      return thread.copyWith(
+        children: nextChildren,
+        previewReplies: nextPreviews,
+      );
+    }
+
+    final nextAuthor = thread.author.copyWith(
+      name: displayName ?? thread.author.name,
+      username: username ?? thread.author.username,
+      avatarUrl: avatarUrl ?? thread.author.avatarUrl,
+      avatarAssetPath: avatarUrl != null ? null : thread.author.avatarAssetPath,
+    );
+
+    return thread.copyWith(
+      author: nextAuthor,
+      children: nextChildren,
+      previewReplies: nextPreviews,
+    );
+  }
+
+  List<ThreadItemModel> _replaceThread(
+    List<ThreadItemModel> threads,
+    String threadId,
+    ThreadItemModel Function(ThreadItemModel thread) update,
+  ) {
+    return threads
+        .map((thread) => thread.id == threadId ? update(thread) : thread)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> close() async {
+    await _realtimeSubscription.cancel();
+    return super.close();
   }
 }

@@ -11,19 +11,27 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
-.coveragedext/
+.codex/
+.dark_skills/
+.dart_tool/
+.github/instructions/
+.github/prompts/
+.github/skills/
+.history/
+openspec/
+
+AGENTS.md
+.dart_skills/
+docs/
+test/
+.agents/
 
 # IntelliJ related
 *.iml
 *.ipr
 *.iws
 .idea/
-.codex/
-.github/
-.codex_appdata/
-.dart_skills/
-openspec/
-test/
+.skillsrc
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
 # is commented out by default.
@@ -38,11 +46,12 @@ test/
 .pub/
 /build/
 /coverage/
+.env
+.vscode/
+
 
 # Symbolication related
 app.*.symbols
-.skillsrc
-AGENTS.md 
 
 # Obfuscation related
 app.*.map.json
@@ -51,3 +60,19 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# FVM Version Cache
+.fvm/
+.fvmrc
+
+# Generated files
+lib/generated/
+**/*.g.dart
+**/*.freezed.dart
+**/*.gen.dart
+**/*.config.dart
+**/*.gr.dart
+
+.metadata
+.tmp/
+.codex_appdata/

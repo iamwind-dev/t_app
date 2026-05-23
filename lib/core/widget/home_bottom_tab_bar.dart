@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:t_app/core/theme/app_icon_tokens.dart';
+
 class _BottomTabIcon {
   const _BottomTabIcon({
     required this.selectedAsset,
@@ -26,12 +28,12 @@ class HomeBottomTabBar extends StatelessWidget {
       deselectedAsset: 'assets/icons/bottom/Light=Home_Deselect.png',
     ),
     _BottomTabIcon(
-      selectedAsset: 'assets/icons/bottom/Light=Search_Select.png',
-      deselectedAsset: 'assets/icons/bottom/Light=Search_Deselect.png',
+      selectedAsset: 'assets/icons/message.png',
+      deselectedAsset: 'assets/icons/message.png',
     ),
     _BottomTabIcon(
-      selectedAsset: 'assets/icons/bottom/Light=Write_Select.png',
-      deselectedAsset: 'assets/icons/bottom/Light=Write_Deselect.png',
+      selectedAsset: 'assets/icons/bottom/Light=Reel_Select.png',
+      deselectedAsset: 'assets/icons/bottom/Light=Reel_Deselect.png',
     ),
     _BottomTabIcon(
       selectedAsset: 'assets/icons/bottom/Light=Activity_Select.png',
@@ -54,14 +56,18 @@ class HomeBottomTabBar extends StatelessWidget {
       padding: EdgeInsets.only(bottom: bottomInset),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        border: Border(top: BorderSide(color: theme.dividerColor)),
+        // border: Border(top: BorderSide(color: theme.dividerColor)),
       ),
       child: Row(
         children: List.generate(_icons.length, (index) {
           final icon = _icons[index];
-          final iconAsset = selectedIndex == index
+          final isSelected = selectedIndex == index;
+          final iconAsset = isSelected
               ? icon.selectedAsset
               : icon.deselectedAsset;
+          final iconColor = isSelected
+              ? AppIconTokens.navigationSelected(context)
+              : AppIconTokens.navigationUnselected(context);
 
           return Expanded(
             child: GestureDetector(
@@ -70,12 +76,11 @@ class HomeBottomTabBar extends StatelessWidget {
               child: Center(
                 child: AnimatedScale(
                   duration: const Duration(milliseconds: 170),
-                  scale: selectedIndex == index ? 1.0 : 0.92,
-                  child: Image.asset(
-                    iconAsset,
-                    width: 30,
-                    height: 30,
-                    fit: BoxFit.contain,
+                  scale: isSelected ? 1.0 : 0.92,
+                  child: ImageIcon(
+                    AssetImage(iconAsset),
+                    size: 30,
+                    color: iconColor,
                   ),
                 ),
               ),

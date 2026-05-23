@@ -1,107 +1,87 @@
 import 'package:equatable/equatable.dart';
+import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 
-class ThreadComment extends Equatable {
-  final String author;
-  final String timeAgo;
-  final String content;
-  final bool showLikeBadge;
-  final String likeCount;
-  final String replyCount;
-  final String repostCount;
-  final String sendCount;
+enum HomeFeedStatus { initial, loading, loaded, failure }
 
-  const ThreadComment({
-    required this.author,
-    required this.timeAgo,
-    required this.content,
-    this.showLikeBadge = false,
-    this.likeCount = '0',
-    this.replyCount = '0',
-    this.repostCount = '0',
-    this.sendCount = '0',
-  });
+class FeedUser extends Equatable {
+  const FeedUser({required this.username, this.avatarAsset});
+
+  final String username;
+  final String? avatarAsset;
 
   @override
-  List<Object?> get props => [
-    author,
-    timeAgo,
-    content,
-    showLikeBadge,
-    likeCount,
-    replyCount,
-    repostCount,
-    sendCount,
-  ];
-}
-
-class ThreadPost extends Equatable {
-  final String author;
-  final String timeAgo;
-  final String content;
-  final String threadStackAsset;
-  final double threadStackHeight;
-  final String likeCount;
-  final String replyCount;
-  final String repostCount;
-  final String sendCount;
-  final String? postImageAsset;
-  final double? postImageHeight;
-  final List<ThreadComment> comments;
-  final bool isVerified;
-  final String? primaryMeta;
-  final String? secondaryMeta;
-
-  const ThreadPost({
-    required this.author,
-    required this.timeAgo,
-    required this.content,
-    required this.threadStackAsset,
-    required this.threadStackHeight,
-    this.likeCount = '0',
-    this.replyCount = '0',
-    this.repostCount = '0',
-    this.sendCount = '0',
-    this.postImageAsset,
-    this.postImageHeight,
-    this.comments = const [],
-    this.isVerified = false,
-    this.primaryMeta,
-    this.secondaryMeta,
-  });
-
-  @override
-  List<Object?> get props => [
-    author,
-    timeAgo,
-    content,
-    threadStackAsset,
-    threadStackHeight,
-    likeCount,
-    replyCount,
-    repostCount,
-    sendCount,
-    postImageAsset,
-    postImageHeight,
-    comments,
-    isVerified,
-    primaryMeta,
-    secondaryMeta,
-  ];
+  List<Object?> get props => [username, avatarAsset];
 }
 
 class HomeState extends Equatable {
-  final List<ThreadPost> posts;
+  static const defaultCurrentUser = FeedUser(
+    username: '__win.d',
+    avatarAsset: 'assets/images/home_avatar_payal.png',
+  );
+
+  const HomeState({
+    this.status = HomeFeedStatus.initial,
+    this.currentUser = defaultCurrentUser,
+    this.rootThreads = const [],
+    this.selectedTabIndex = 0,
+    this.lastLoadedAtEpochMs,
+    this.errorMessage,
+    this.isLoadingMore = false,
+    this.hasMore = true,
+    this.nextCursor,
+    this.isRefreshing = false,
+  });
+
+  final HomeFeedStatus status;
+  final FeedUser currentUser;
+  final List<ThreadItemModel> rootThreads;
   final int selectedTabIndex;
+  final int? lastLoadedAtEpochMs;
+  final String? errorMessage;
+  final bool isLoadingMore;
+  final bool hasMore;
+  final String? nextCursor;
+  final bool isRefreshing;
 
-  const HomeState({this.posts = const [], this.selectedTabIndex = 0});
-
-  HomeState copyWith({List<ThreadPost>? posts, int? selectedTabIndex}) {
+  HomeState copyWith({
+    HomeFeedStatus? status,
+    FeedUser? currentUser,
+    List<ThreadItemModel>? rootThreads,
+    int? selectedTabIndex,
+    int? lastLoadedAtEpochMs,
+    String? errorMessage,
+    bool clearError = false,
+    bool? isLoadingMore,
+    bool? hasMore,
+    String? nextCursor,
+    bool clearCursor = false,
+    bool? isRefreshing,
+  }) {
     return HomeState(
-      posts: posts ?? this.posts,
+      status: status ?? this.status,
+      currentUser: currentUser ?? this.currentUser,
+      rootThreads: rootThreads ?? this.rootThreads,
       selectedTabIndex: selectedTabIndex ?? this.selectedTabIndex,
+      lastLoadedAtEpochMs: lastLoadedAtEpochMs ?? this.lastLoadedAtEpochMs,
+      errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      hasMore: hasMore ?? this.hasMore,
+      nextCursor: clearCursor ? null : nextCursor ?? this.nextCursor,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
     );
   }
 
   @override
-  List<Object?> get props => [posts, selectedTabIndex];
+  List<Object?> get props => [
+    status,
+    currentUser,
+    rootThreads,
+    selectedTabIndex,
+    lastLoadedAtEpochMs,
+    errorMessage,
+    isLoadingMore,
+    hasMore,
+    nextCursor,
+    isRefreshing,
+  ];
 }

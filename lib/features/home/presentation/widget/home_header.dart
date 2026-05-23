@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:t_app/core/theme/app_icon_tokens.dart';
+import 'package:t_app/generated/assets.gen.dart';
 
 class HomeHeader extends StatelessWidget {
   const HomeHeader({super.key, this.isCompact = false});
@@ -26,9 +28,15 @@ class HomeHeader extends StatelessWidget {
           curve: Curves.easeInOutCubic,
           width: logoWidth,
           height: logoHeight,
-          child: Image.asset(
-            'assets/images/home_threads_logo.png',
+          child: Assets.icons.logo.svg(
+            key: const Key('home_header_logo'),
+            width: logoWidth,
+            height: logoHeight,
             fit: BoxFit.contain,
+            colorFilter: ColorFilter.mode(
+              AppIconTokens.logo(context),
+              BlendMode.srcIn,
+            ),
           ),
         ),
         AnimatedContainer(
@@ -36,7 +44,7 @@ class HomeHeader extends StatelessWidget {
           curve: Curves.easeInOutCubic,
           height: bottomSpace,
         ),
-        Divider(height: 1, thickness: 1, color: Theme.of(context).dividerColor),
+        // Divider(height: 1, thickness: 1, color: Theme.of(context).dividerColor),
       ],
     );
   }
