@@ -85,7 +85,6 @@ flutter:
     - assets/icons/
     - assets/icons/bottom/
     - assets/icons/search/
-    - .env
   fonts:
     - family: Roboto
       fonts:
