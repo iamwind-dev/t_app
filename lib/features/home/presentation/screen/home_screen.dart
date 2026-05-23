@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:t_app/features/activity/presentation/screen/activity_screen.dart';
-import 'package:t_app/core/theme/theme_mode_cubit.dart';
 import 'package:t_app/core/widget/home_bottom_tab_bar.dart';
+import 'package:t_app/features/auth/data/auth_user.dart';
 import 'package:t_app/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:t_app/features/chat/data/chat_socket_service.dart';
 import 'package:t_app/features/chat/presentation/screen/chat_inbox_screen.dart';
@@ -15,7 +15,9 @@ import 'package:t_app/features/post_detail/presentation/screen/thread_detail_scr
 import 'package:t_app/features/post_detail/presentation/screen/thread_reply_screen.dart';
 import 'package:t_app/features/profile/presentation/screen/profile_screen.dart';
 import 'package:t_app/features/reels/presentation/pages/reels_page.dart';
+import 'package:t_app/features/reels/presentation/sheet/create_reel_sheet.dart';
 import 'package:t_app/features/search/presentation/screen/search_screen.dart';
+import 'package:t_app/features/search/presentation/theme/search_tokens.dart';
 
 import '../cubits/home_cubit.dart';
 import '../cubits/home_state.dart';
@@ -39,17 +41,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _isBottomBarVisible = true;
   bool _isHeaderCompact = false;
   double _lastOffset = 0;
-  bool _isChatOpen = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
     _scrollController = ScrollController()..addListener(_handleScroll);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
       }
+
       unawaited(_bindFeedRealtime());
       unawaited(context.read<HomeCubit>().syncIfStale());
     });
@@ -79,6 +83,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     final offset = _scrollController.offset;
     final delta = offset - _lastOffset;
+
     if (delta > _toggleThreshold && mounted) {
       if (_isBottomBarVisible || !_isHeaderCompact) {
         setState(() {
@@ -96,58 +101,76 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     _lastOffset = offset < 0 ? 0 : offset;
+
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 300) {
+      context.read<HomeCubit>().loadMoreHomeFeed();
+    }
   }
 
   double _bottomSpace(BuildContext context) {
     return _barHeight + MediaQuery.paddingOf(context).bottom + 12;
   }
 
-  User _buildCurrentUser(HomeState state) {
-    final authUser = context.read<AuthCubit>().state.user;
+  User _buildCurrentUser(HomeState state, AuthUser? authUser) {
+    final username = authUser?.username ?? state.currentUser.username;
+    final isDemoUser = username == state.currentUser.username;
+
     return User(
       id: authUser?.id ?? 'current_user',
-      name: authUser?.displayName ?? state.currentUser.username,
-      username: authUser?.username ?? state.currentUser.username,
+      name: username,
+      username: username,
       avatarUrl: authUser?.avatarUrl,
       avatarAssetPath: authUser?.avatarUrl == null
-          ? state.currentUser.avatarAsset
+          ? (isDemoUser ? state.currentUser.avatarAsset : null)
           : null,
     );
   }
 
-  FeedUser _buildFeedCurrentUser(HomeState state) {
-    final authUser = context.read<AuthCubit>().state.user;
-    final avatarUrl = authUser?.avatarUrl;
-    return FeedUser(
-      username: authUser?.username ?? state.currentUser.username,
-      avatarAsset: (avatarUrl != null && avatarUrl.isNotEmpty)
-          ? avatarUrl
-          : state.currentUser.avatarAsset,
-    );
-  }
 
-  Future<void> _openCreateThreadSheet(HomeState state) {
+  Future<void> _openCreateThreadSheet(
+    HomeState state,
+    AuthUser? authUser,
+  ) {
     return showCreateThreadSheet(
       context: context,
-      currentUser: _buildCurrentUser(state),
+      currentUser: _buildCurrentUser(state, authUser),
       onSubmit: (request) => context.read<HomeCubit>().createPost(
-        request.primaryContent,
-        mediaUrls: request.mediaUrls,
-      ),
+            request.primaryContent,
+            mediaUrls: request.mediaUrls,
+          ),
+      onSubmissionAccepted: (submission) async {
+        if (!mounted) {
+          return;
+        }
+
+        final newPost = submission.thread;
+        if (newPost != null) {
+          context.read<HomeCubit>().insertCreatedPost(newPost);
+        }
+
+        final success = await context
+            .read<HomeCubit>()
+            .refreshFeed(isFromPostCreation: true);
+
+        if (success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Đã đăng bài'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
     );
   }
 
   void _handleBottomTabTap(int index, HomeState state) {
-    if (_isChatOpen) {
-      setState(() => _isChatOpen = false);
-    }
-
-    // if (index == 2) {
-    //   _openCreateThreadSheet(state);
-    //   return;
-    // }
-
     context.read<HomeCubit>().changeTab(index);
+  }
+
+  void _openCreateReelSheet() {
+    showCreateReelSheet(context);
   }
 
   void _openThreadDetail(ThreadItemModel rootThread) {
@@ -172,8 +195,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _refreshHomeFeed() {
-    return context.read<HomeCubit>().loadHomeFeed();
+  Future<void> _refreshHomeFeed() async {
+    await context.read<HomeCubit>().refreshFeed();
   }
 
   Future<void> _bindFeedRealtime() async {
@@ -184,54 +207,69 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _syncOnResume() async {
     final socketService = context.read<ChatSocketService>();
+    final homeCubit = context.read<HomeCubit>();
     await socketService.syncEvents(rooms: const ['feed:global']);
-    await context.read<HomeCubit>().syncIfStale(maxAge: const Duration(minutes: 1));
+    await homeCubit.syncIfStale(
+      maxAge: const Duration(minutes: 1),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final selectedThemeMode = context.select(
-      (ThemeModeCubit cubit) => cubit.state,
+    final currentUser = context.select(
+      (AuthCubit cubit) => cubit.state.user,
     );
-    final currentUser = context.select((AuthCubit cubit) => cubit.state.user);
 
-    return BlocBuilder<HomeCubit, HomeState>(
-      builder: (context, state) {
-        final isSearchTab = state.selectedTabIndex == 1;
-        final isReelsTab = state.selectedTabIndex == 2;
-        final isActivityTab = state.selectedTabIndex == 3;
-        final isProfileTab = state.selectedTabIndex == 4;
-        final shouldShowBottomBar =
-            _isChatOpen ||
-            isSearchTab ||
-          isReelsTab ||
-            isActivityTab ||
-            isProfileTab ||
-            _isBottomBarVisible;
+    return BlocListener<HomeCubit, HomeState>(
+      listenWhen: (previous, current) =>
+          previous.errorMessage != current.errorMessage,
+      listener: (context, state) {
+        if (state.errorMessage != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.errorMessage!),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          context.read<HomeCubit>().clearError();
+        }
+      },
+      child: BlocBuilder<HomeCubit, HomeState>(
+        builder: (context, state) {
+          final isMessageTab = state.selectedTabIndex == 1;
+          final isReelsTab = state.selectedTabIndex == 2;
+          final isActivityTab = state.selectedTabIndex == 3;
+          final isProfileTab = state.selectedTabIndex == 4;
 
-        return PopScope(
-          canPop: !_isChatOpen,
-          onPopInvokedWithResult: (didPop, _) {
-            if (!didPop && _isChatOpen) {
-              setState(() => _isChatOpen = false);
-            }
-          },
-          child: Scaffold(
+          final shouldShowBottomBar =
+              isMessageTab ||
+              isReelsTab ||
+              isActivityTab ||
+              isProfileTab ||
+              _isBottomBarVisible;
+
+          return Scaffold(
             body: SafeArea(
               bottom: false,
               child: Stack(
                 children: [
-                  if (_isChatOpen)
-                    ChatInboxScreen(bottomPadding: _bottomSpace(context))
-                  else if (isSearchTab)
-                    SearchScreen(bottomPadding: _bottomSpace(context))
+                  if (isMessageTab)
+                    ChatInboxScreen(
+                      bottomPadding: _bottomSpace(context),
+                    )
                   else if (isActivityTab)
-                    ActivityScreen(bottomPadding: _bottomSpace(context))
+                    ActivityScreen(
+                      bottomPadding: _bottomSpace(context),
+                    )
                   else if (isReelsTab)
-                    ReelsPage(bottomPadding: _bottomSpace(context))
+                    ReelsPage(
+                      bottomPadding: _bottomSpace(context),
+                    )
                   else if (isProfileTab)
                     currentUser == null
-                        ? const Center(child: Text('Không thể tải hồ sơ.'))
+                        ? const Center(
+                            child: Text('Không thể tải hồ sơ.'),
+                          )
                         : ProfileScreen(
                             userId: currentUser.id,
                             bottomPadding: _bottomSpace(context),
@@ -245,22 +283,53 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             onRefresh: _refreshHomeFeed,
                             child: ListView.separated(
                               controller: _scrollController,
-                              physics: const AlwaysScrollableScrollPhysics(),
+                              physics:
+                                  const AlwaysScrollableScrollPhysics(),
                               padding: EdgeInsets.only(
                                 bottom: shouldShowBottomBar
                                     ? _bottomSpace(context)
                                     : 12,
                               ),
-                              itemCount: state.rootThreads.length + 1,
+                              itemCount: state.rootThreads.length +
+                                  1 +
+                                  (state.isLoadingMore ? 1 : 0),
                               itemBuilder: (context, index) {
                                 if (index == 0) {
                                   return CreatePostCard(
-                                    currentUser: _buildFeedCurrentUser(state),
-                                    onTap: () => _openCreateThreadSheet(state),
+                                    currentUser: _buildCurrentUser(
+                                      state,
+                                      currentUser,
+                                    ),
+                                    onTap: () => _openCreateThreadSheet(
+                                      state,
+                                      currentUser,
+                                    ),
                                   );
                                 }
 
-                                final rootThread = state.rootThreads[index - 1];
+                                if (state.isLoadingMore &&
+                                    index ==
+                                        state.rootThreads.length + 1) {
+                                  return const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child:
+                                            CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                final rootThread =
+                                    state.rootThreads[index - 1];
+
                                 return Padding(
                                   padding: const EdgeInsets.fromLTRB(
                                     0,
@@ -279,39 +348,60 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                         .togglePostLike,
                                     onPreviewReplyTap: (replyThread) =>
                                         _openThreadBranch(
-                                          rootThread: rootThread,
-                                          selectedThread: replyThread,
-                                        ),
+                                      rootThread: rootThread,
+                                      selectedThread: replyThread,
+                                    ),
                                   ),
                                 );
                               },
-                              separatorBuilder: (_, __) => const PostDivider(),
+                              separatorBuilder: (context, index) {
+                                if (state.isLoadingMore &&
+                                    index == state.rootThreads.length) {
+                                  return const SizedBox.shrink();
+                                }
+
+                                return const PostDivider();
+                              },
                             ),
                           ),
                         ),
                       ],
                     ),
-                  if (!_isChatOpen &&
-                      !isSearchTab &&
+                  if (!isMessageTab &&
                       !isReelsTab &&
                       !isActivityTab &&
                       !isProfileTab)
                     Positioned(
                       top: 8,
                       right: 10,
-                      child: Row(
-                        children: [
-                          _ChatButton(
-                            onTap: () => setState(() => _isChatOpen = true),
-                          ),
-                          const SizedBox(width: 8),
-                          _ThemeModeMenuButton(
-                            selectedThemeMode: selectedThemeMode,
-                            onSelected: context
-                                .read<ThemeModeCubit>()
-                                .setThemeMode,
-                          ),
-                        ],
+                      child: IconButton(
+                        icon: const Icon(Icons.search, size: 28),
+                        color: Theme.of(context).colorScheme.onSurface,
+                        splashColor: Colors.transparent,
+                        highlightColor: Colors.transparent,
+                        hoverColor: Colors.transparent,
+                        focusColor: Colors.transparent,
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (context) => Scaffold(
+                                backgroundColor:
+                                    SearchTokens.pageBackground(context),
+                                appBar: AppBar(
+                                  backgroundColor: Colors.transparent,
+                                  elevation: 0,
+                                  scrolledUnderElevation: 0,
+                                  shadowColor: Colors.transparent,
+                                  surfaceTintColor: Colors.transparent,
+                                  leading: const BackButton(),
+                                ),
+                                body: const SearchScreen(
+                                  bottomPadding: 16,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   Positioned(
@@ -332,7 +422,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ignoring: !shouldShowBottomBar,
                           child: HomeBottomTabBar(
                             selectedIndex: state.selectedTabIndex,
-                            onTap: (index) => _handleBottomTabTap(index, state),
+                            onTap: (index) =>
+                                _handleBottomTabTap(index, state),
+                            onReelsCreateTap: _openCreateReelSheet,
                           ),
                         ),
                       ),
@@ -341,119 +433,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ],
               ),
             ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _ChatButton extends StatelessWidget {
-  const _ChatButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: IconButton(
-        tooltip: 'Tin nhắn',
-        icon: const Icon(Icons.chat_bubble_outline_rounded, size: 20),
-        color: colorScheme.onSurface,
-        onPressed: onTap,
+          );
+        },
       ),
     );
-  }
-}
-
-class _ThemeModeMenuButton extends StatelessWidget {
-  const _ThemeModeMenuButton({
-    required this.selectedThemeMode,
-    required this.onSelected,
-  });
-
-  final ThemeMode selectedThemeMode;
-  final ValueChanged<ThemeMode> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: PopupMenuButton<ThemeMode>(
-        key: const Key('theme_mode_menu_button'),
-        tooltip: 'Chế độ giao diện',
-        initialValue: selectedThemeMode,
-        onSelected: onSelected,
-        icon: Icon(
-          _iconForThemeMode(selectedThemeMode),
-          size: 20,
-          color: colorScheme.onSurface,
-        ),
-        itemBuilder: (context) => [
-          _buildThemeModeItem(
-            context,
-            value: ThemeMode.system,
-            label: 'Theo hệ thống',
-            selectedThemeMode: selectedThemeMode,
-          ),
-          _buildThemeModeItem(
-            context,
-            value: ThemeMode.light,
-            label: 'Sáng',
-            selectedThemeMode: selectedThemeMode,
-          ),
-          _buildThemeModeItem(
-            context,
-            value: ThemeMode.dark,
-            label: 'Tối',
-            selectedThemeMode: selectedThemeMode,
-          ),
-        ],
-      ),
-    );
-  }
-
-  static PopupMenuItem<ThemeMode> _buildThemeModeItem(
-    BuildContext context, {
-    required ThemeMode value,
-    required String label,
-    required ThemeMode selectedThemeMode,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return PopupMenuItem<ThemeMode>(
-      value: value,
-      child: Row(
-        children: [
-          Expanded(child: Text(label)),
-          if (selectedThemeMode == value)
-            Icon(Icons.check, size: 18, color: colorScheme.primary),
-        ],
-      ),
-    );
-  }
-
-  static IconData _iconForThemeMode(ThemeMode themeMode) {
-    switch (themeMode) {
-      case ThemeMode.system:
-        return Icons.brightness_auto_rounded;
-      case ThemeMode.light:
-        return Icons.light_mode_outlined;
-      case ThemeMode.dark:
-        return Icons.dark_mode_outlined;
-    }
   }
 }

@@ -38,10 +38,10 @@ class BackendChatRepository implements ChatRepository {
   }
 
   @override
-  Future<MessagePage> getMessages(String conversationId, {String? cursor}) {
+  Future<MessagePage> getMessages(String conversationId, {int limit = 10, String? cursor}) {
     return _apiClient.get<MessagePage>(
       '/conversations/$conversationId/messages',
-      queryParameters: {'limit': 30, if (cursor != null) 'cursor': cursor},
+      queryParameters: {'limit': limit, if (cursor != null) 'cursor': cursor},
       decode: (value) => MessagePage.fromJson(_asMap(value)),
     );
   }

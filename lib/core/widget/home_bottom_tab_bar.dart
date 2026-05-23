@@ -17,10 +17,12 @@ class HomeBottomTabBar extends StatelessWidget {
     super.key,
     required this.selectedIndex,
     required this.onTap,
+    this.onReelsCreateTap,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onTap;
+  final VoidCallback? onReelsCreateTap;
 
   static const _icons = [
     _BottomTabIcon(
@@ -28,8 +30,8 @@ class HomeBottomTabBar extends StatelessWidget {
       deselectedAsset: 'assets/icons/bottom/Light=Home_Deselect.png',
     ),
     _BottomTabIcon(
-      selectedAsset: 'assets/icons/bottom/Light=Search_Select.png',
-      deselectedAsset: 'assets/icons/bottom/Light=Search_Deselect.png',
+      selectedAsset: 'assets/icons/message.png',
+      deselectedAsset: 'assets/icons/message.png',
     ),
     _BottomTabIcon(
       selectedAsset: 'assets/icons/bottom/Light=Reel_Select.png',
@@ -48,20 +50,21 @@ class HomeBottomTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
       height: 78 + bottomInset,
       padding: EdgeInsets.only(bottom: bottomInset),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        border: Border(top: BorderSide(color: theme.dividerColor)),
+        // border: Border(top: BorderSide(color: theme.dividerColor)),
       ),
       child: Row(
         children: List.generate(_icons.length, (index) {
           final icon = _icons[index];
           final isSelected = selectedIndex == index;
+          final isReelsCreateAction =
+              index == 2 && isSelected && onReelsCreateTap != null;
           final iconAsset = isSelected
               ? icon.selectedAsset
               : icon.deselectedAsset;
@@ -72,16 +75,22 @@ class HomeBottomTabBar extends StatelessWidget {
           return Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => onTap(index),
+              onTap: isReelsCreateAction ? onReelsCreateTap : () => onTap(index),
               child: Center(
                 child: AnimatedScale(
                   duration: const Duration(milliseconds: 170),
                   scale: isSelected ? 1.0 : 0.92,
-                  child: ImageIcon(
-                    AssetImage(iconAsset),
-                    size: 30,
-                    color: iconColor,
-                  ),
+                  child: isReelsCreateAction
+                      ? Icon(
+                          Icons.add_rounded,
+                          size: 32,
+                          color: iconColor,
+                        )
+                      : ImageIcon(
+                          AssetImage(iconAsset),
+                          size: 30,
+                          color: iconColor,
+                        ),
                 ),
               ),
             ),

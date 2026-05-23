@@ -6,7 +6,6 @@ import 'package:t_app/features/chat/domain/chat_repository.dart';
 import 'package:t_app/features/chat/presentation/cubit/direct_conversation_cubit.dart';
 import 'package:t_app/features/chat/presentation/cubit/direct_conversation_state.dart';
 import 'package:t_app/features/chat/presentation/screen/chat_thread_screen.dart';
-import 'package:t_app/features/home/presentation/cubits/home_state.dart';
 import 'package:t_app/features/home/presentation/widget/create_post_card.dart';
 import 'package:t_app/features/home/presentation/widget/post_divider.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
@@ -1276,10 +1275,17 @@ class ProfileComposerPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CreatePostCard(
-      currentUser: FeedUser(
-        username: profile.username,
-        avatarAsset: profile.avatarUrl,
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: CreatePostCard(
+        currentUser: User(
+          id: profile.id,
+          name: profile.displayName,
+          username: profile.username,
+          avatarUrl: profile.avatarUrl,
+        ),
+
       ),
     );
   }

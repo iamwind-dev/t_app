@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:t_app/core/keys/chat/chat_widget_keys.dart';
 import 'package:t_app/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:t_app/features/chat/data/chat_conversation.dart';
+import 'package:t_app/features/chat/data/shared_reel_message.dart';
 import 'package:t_app/features/chat/domain/chat_repository.dart';
 import 'package:t_app/features/chat/presentation/cubit/chat_inbox_cubit.dart';
 import 'package:t_app/features/chat/presentation/cubit/chat_inbox_state.dart';
@@ -281,7 +282,7 @@ class _InboxPreviewTile extends StatelessWidget {
     final currentUserId = context.read<AuthCubit>().state.user?.id ?? '';
     final user = conversation.otherMember(currentUserId)?.user;
     final title = user?.username ?? 'Không xác định';
-    final subtitle = conversation.lastMessage?.text ?? 'Chưa có tin nhắn';
+    final subtitle = _subtitle(conversation.lastMessage?.displayContent);
 
     return GestureDetector(
       key: ChatWidgetKeys.inboxConversationPreview,
@@ -335,6 +336,15 @@ class _InboxPreviewTile extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _subtitle(String? rawContent) {
+    final sharedReel = tryDecodeSharedReelMessage(rawContent);
+    if (sharedReel != null) {
+      return 'Shared a reel';
+    }
+
+    return rawContent ?? 'Chưa có tin nhắn';
   }
 }
 

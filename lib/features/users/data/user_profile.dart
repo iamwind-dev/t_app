@@ -16,13 +16,16 @@ class UserProfile extends Equatable {
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
+    final rawAvatarUrl =
+        json['avatarUrl'] ?? json['avatar_url'] ?? json['avatar'];
+
     return UserProfile(
       id: json['id'] as String,
       username: json['username'] as String,
       displayName: json['displayName'] as String? ?? json['username'] as String,
       bio: json['bio'] as String?,
       avatarUrl: BackendUrlNormalizer.normalizeNullable(
-        json['avatarUrl'] as String?,
+        rawAvatarUrl as String?,
       ),
       followersCount: json['followersCount'] as int? ?? 0,
       followingCount: json['followingCount'] as int? ?? 0,
@@ -71,17 +74,17 @@ class UserProfile extends Equatable {
 
   @override
   List<Object?> get props => [
-    id,
-    username,
-    displayName,
-    bio,
-    avatarUrl,
-    followersCount,
-    followingCount,
-    postCount,
-    isFollowing,
-    tags,
-  ];
+        id,
+        username,
+        displayName,
+        bio,
+        avatarUrl,
+        followersCount,
+        followingCount,
+        postCount,
+        isFollowing,
+        tags,
+      ];
 
   static List<String> _readTags(Object? value) {
     if (value is! List) {

@@ -14,7 +14,9 @@ migrate_working_dir/
 .codex/
 .dark_skills/
 .dart_tool/
-.github/
+.github/instructions/
+.github/prompts/
+.github/skills/
 .history/
 openspec/
 
@@ -22,6 +24,7 @@ AGENTS.md
 .dart_skills/
 docs/
 test/
+.agents/
 
 # IntelliJ related
 *.iml

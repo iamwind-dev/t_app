@@ -20,7 +20,10 @@ class PostPage extends Equatable {
           : const [],
       pageInfo: pageInfo is Map<String, dynamic>
           ? PostPageInfo.fromJson(pageInfo)
-          : const PostPageInfo(nextCursor: null, hasNextPage: false),
+          : PostPageInfo(
+              nextCursor: json['nextCursor'] as String?,
+              hasNextPage: (json['hasNextPage'] ?? json['hasMore']) as bool? ?? false,
+            ),
     );
   }
 
@@ -37,7 +40,7 @@ class PostPageInfo extends Equatable {
   factory PostPageInfo.fromJson(Map<String, dynamic> json) {
     return PostPageInfo(
       nextCursor: json['nextCursor'] as String?,
-      hasNextPage: json['hasNextPage'] as bool? ?? false,
+      hasNextPage: (json['hasNextPage'] ?? json['hasMore']) as bool? ?? false,
     );
   }
 

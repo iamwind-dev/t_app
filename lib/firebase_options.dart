@@ -23,20 +23,11 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -66,4 +57,33 @@ class DefaultFirebaseOptions {
     projectId: 't-app-7062f',
     storageBucket: 't-app-7062f.firebasestorage.app',
   );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyBB66wUOyrGjabK1mj1SasvdYh5fc8SyA8',
+    appId: '1:414176667873:ios:fe6be45e95054b15732fa0',
+    messagingSenderId: '414176667873',
+    projectId: 't-app-7062f',
+    storageBucket: 't-app-7062f.firebasestorage.app',
+    iosBundleId: 'com.example.tApp',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyBB66wUOyrGjabK1mj1SasvdYh5fc8SyA8',
+    appId: '1:414176667873:ios:fe6be45e95054b15732fa0',
+    messagingSenderId: '414176667873',
+    projectId: 't-app-7062f',
+    storageBucket: 't-app-7062f.firebasestorage.app',
+    iosBundleId: 'com.example.tApp',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyBya_Cc8wmumPtSN9Z72L94JiTqeMMySoE',
+    appId: '1:414176667873:web:857c0d31a073585d732fa0',
+    messagingSenderId: '414176667873',
+    projectId: 't-app-7062f',
+    authDomain: 't-app-7062f.firebaseapp.com',
+    storageBucket: 't-app-7062f.firebasestorage.app',
+    measurementId: 'G-MJG1WWFRB0',
+  );
+
 }

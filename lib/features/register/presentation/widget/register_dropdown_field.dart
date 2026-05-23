@@ -25,7 +25,7 @@ class RegisterDropdownField extends StatelessWidget {
         : colorScheme.primary;
 
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       dropdownColor: fillColor,
       iconEnabledColor: colorScheme.onSurfaceVariant,
       style: TextStyle(
@@ -35,10 +35,7 @@ class RegisterDropdownField extends StatelessWidget {
       ),
       items: items
           .map(
-            (item) => DropdownMenuItem<String>(
-              value: item,
-              child: Text(item),
-            ),
+            (item) => DropdownMenuItem<String>(value: item, child: Text(item)),
           )
           .toList(),
       onChanged: onChanged,
@@ -61,31 +58,19 @@ class RegisterDropdownField extends StatelessWidget {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(
-            color: borderColor,
-            width: 1,
-          ),
+          borderSide: BorderSide(color: borderColor, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(
-            color: focusedBorderColor,
-            width: 1,
-          ),
+          borderSide: BorderSide(color: focusedBorderColor, width: 1),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(
-            color: Colors.redAccent,
-            width: 1,
-          ),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(
-            color: Colors.redAccent,
-            width: 1,
-          ),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1),
         ),
       ),
     );

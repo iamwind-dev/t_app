@@ -42,6 +42,8 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
           status: ChatThreadStatus.loaded,
           messages: DemoData.messages(state.conversation.id),
           clearError: true,
+          hasMoreOlder: false,
+          clearOlderCursor: true,
         ),
       );
       return;
@@ -50,7 +52,7 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
     emit(state.copyWith(status: ChatThreadStatus.loading, clearError: true));
 
     try {
-      final page = await _repository.getMessages(state.conversation.id);
+      final page = await _repository.getMessages(state.conversation.id, limit: 10);
       emit(
         state.copyWith(
           status: ChatThreadStatus.loaded,
@@ -60,6 +62,8 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
               )
               .toList(),
           clearError: true,
+          hasMoreOlder: page.pageInfo.hasNextPage,
+          olderCursor: page.pageInfo.nextCursor,
         ),
       );
       await _markLatestIncomingSeen();
@@ -77,6 +81,46 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
           errorMessage: 'Không thể tải tin nhắn.',
         ),
       );
+    }
+  }
+
+  /// Loads older messages for the current thread and prepends them.
+  Future<void> loadOlderMessages() async {
+    if (state.isLoadingOlder ||
+        !state.hasMoreOlder ||
+        state.status == ChatThreadStatus.loading ||
+        AppConfig.uiPreviewMode) {
+      return;
+    }
+
+    emit(state.copyWith(isLoadingOlder: true));
+
+    try {
+      final page = await _repository.getMessages(
+        state.conversation.id,
+        limit: 10,
+        cursor: state.olderCursor,
+      );
+
+      final mappedNew = page.items
+          .map((message) => message.copyWith(status: _messageStatus(message)))
+          .toList();
+
+      final existingIds = state.messages.map((m) => m.id).toSet();
+      final uniqueNew = mappedNew
+          .where((m) => !existingIds.contains(m.id))
+          .toList();
+
+      emit(
+        state.copyWith(
+          messages: [...state.messages, ...uniqueNew],
+          isLoadingOlder: false,
+          hasMoreOlder: page.pageInfo.hasNextPage,
+          olderCursor: page.pageInfo.nextCursor,
+        ),
+      );
+    } catch (_) {
+      emit(state.copyWith(isLoadingOlder: false));
     }
   }
 
@@ -220,20 +264,32 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
       ..add(socketService.messageSeen.listen(_handleMessageSeen));
   }
 
+  /// Notifies the socket that the user started typing.
+  /// Errors are silently ignored — typing indicators are best-effort.
   Future<void> typingStart() async {
     if (AppConfig.uiPreviewMode) {
       return;
     }
 
-    await _socketService?.typingStart(state.conversation.id);
+    try {
+      await _socketService?.typingStart(state.conversation.id);
+    } catch (_) {
+      // Typing is fire-and-forget; a disconnected socket must not crash the UI.
+    }
   }
 
+  /// Notifies the socket that the user stopped typing.
+  /// Errors are silently ignored — typing indicators are best-effort.
   Future<void> typingStop() async {
     if (AppConfig.uiPreviewMode) {
       return;
     }
 
-    await _socketService?.typingStop(state.conversation.id);
+    try {
+      await _socketService?.typingStop(state.conversation.id);
+    } catch (_) {
+      // Typing is fire-and-forget; a disconnected socket must not crash the UI.
+    }
   }
 
   /// Deletes one of the current user's messages through the REST API.

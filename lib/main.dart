@@ -6,7 +6,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:t_app/features/reels/data/datasources/reels_local_data_source.dart';
 import 'package:t_app/features/reels/data/repositories_impl/reels_repository_impl.dart';
 import 'package:t_app/features/reels/domain/repositories/reels_repository.dart';
 import 'package:t_app/features/reels/domain/usecases/get_reels.dart';
@@ -15,8 +14,8 @@ import 'package:t_app/features/reels/presentation/cubits/reels_cubit.dart';
 import 'core/config/app_config.dart';
 import 'core/network/api_client.dart';
 import 'core/network/api_token_store.dart';
-import 'core/notifications/fcm_token_service.dart';
 import 'core/network/secure_api_token_store.dart';
+import 'core/notifications/fcm_token_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/system_ui_helper.dart';
 import 'core/theme/theme_mode_cubit.dart';
@@ -44,46 +43,100 @@ import 'features/users/domain/users_profile_repository.dart';
 
 import 'firebase_options.dart';
 
+@pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Render something immediately. If startup fails, the app will show the error
+  // instead of staying forever on the native splash screen.
+  runApp(const BootDebugApp(message: 'Starting app...'));
+
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).timeout(const Duration(seconds: 10));
+  } catch (error) {
+    runApp(
+      BootDebugApp(
+        message: 'Firebase startup error:\n$error',
+      ),
+    );
+    return;
+  }
+
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  final themeModeStorage = ThemeModeStorage();
-  final initialThemeMode = await themeModeStorage.load();
+
+  late final ThemeModeStorage themeModeStorage;
+  late final ThemeMode initialThemeMode;
+
+  try {
+    themeModeStorage = ThemeModeStorage();
+    initialThemeMode = await themeModeStorage.load().timeout(
+      const Duration(seconds: 10),
+    );
+  } catch (error) {
+    runApp(
+      BootDebugApp(
+        message: 'Theme startup error:\n$error',
+      ),
+    );
+    return;
+  }
+
   const tokenStore = SecureApiTokenStore();
+
+  final apiBaseUrl = AppConfig.apiBaseUrl.trim();
+
   final apiClient = ApiClient(
-    dio: Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl)),
+    dio: Dio(
+      BaseOptions(
+        baseUrl: apiBaseUrl,
+      ),
+    ),
     tokenStore: tokenStore,
   );
+
   final authRepository = AuthRepository(
     apiClient: apiClient,
     tokenStore: tokenStore,
   );
+
   final usersRepository = UsersRepository(apiClient: apiClient);
   final postsRepository = PostsRepository(apiClient: apiClient);
   final uploadsRepository = UploadsRepository(apiClient: apiClient);
   final notificationsRepository = NotificationsRepository(apiClient: apiClient);
   final deviceTokensRepository = DeviceTokensRepository(apiClient: apiClient);
+
   final fcmTokenService = FcmTokenService(
     deviceTokensRepository: deviceTokensRepository,
   );
-  await fcmTokenService.initialize();
+
+  // Do not block app startup forever if APNs/FCM fails, especially for
+  // sideloaded iOS builds where push capabilities may not be fully available.
+  try {
+    await fcmTokenService.initialize().timeout(
+      const Duration(seconds: 10),
+    );
+  } catch (error) {
+    debugPrint('FCM initialize error: $error');
+  }
+
   final chatSocketService = SocketIoChatRealtimeClient(
-    baseUrl: AppConfig.apiBaseUrl,
+    baseUrl: apiBaseUrl,
     tokenStore: tokenStore,
   );
+
   final chatRepository = BackendChatRepository(
     apiClient: apiClient,
     realtimeClient: chatSocketService,
   );
-  final reelsLocalDataSource = ReelsLocalDataSourceImpl();
-  final reelsRepository = ReelsRepositoryImpl(
-    localDataSource: reelsLocalDataSource,
-  );
+
+  final reelsRepository = ReelsRepositoryImpl(apiClient: apiClient);
+
 
   runApp(
     TogetherApp(
@@ -102,6 +155,34 @@ Future<void> main() async {
       reelsRepository: reelsRepository,
     ),
   );
+}
+
+class BootDebugApp extends StatelessWidget {
+  const BootDebugApp({
+    super.key,
+    required this.message,
+  });
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Together',
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class TogetherApp extends StatelessWidget {
@@ -176,7 +257,10 @@ class TogetherApp extends StatelessWidget {
           ),
           BlocProvider(
             create: (_) =>
-                ReelsCubit(getReels: GetReels(reelsRepository))..loadReels(),
+                ReelsCubit(
+                  getReels: GetReels(reelsRepository),
+                  repository: reelsRepository,
+                )..loadReels(),
           ),
         ],
         child: BlocBuilder<ThemeModeCubit, ThemeMode>(
@@ -211,7 +295,7 @@ class _AuthGate extends StatelessWidget {
           previous.status != current.status &&
           current.status == AuthStatus.authenticated,
       listener: (context, state) {
-        unawaited(context.read<FcmTokenService>().syncTokenForAuthenticatedUser());
+        unawaited(_syncFcmTokenSafely(context));
         unawaited(context.read<ChatSocketService>().connect());
         unawaited(context.read<ChatSocketService>().joinRoom('feed:global'));
         unawaited(
@@ -224,14 +308,22 @@ class _AuthGate extends StatelessWidget {
         builder: (context, state) {
           return switch (state.status) {
             AuthStatus.checking => const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            ),
+                body: Center(child: CircularProgressIndicator()),
+              ),
             AuthStatus.authenticated => const HomeScreen(),
             _ => const LoginScreen(),
           };
         },
       ),
     );
+  }
+
+  Future<void> _syncFcmTokenSafely(BuildContext context) async {
+    try {
+      await context.read<FcmTokenService>().syncTokenForAuthenticatedUser();
+    } catch (error) {
+      debugPrint('FCM token sync error: $error');
+    }
   }
 }
 

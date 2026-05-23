@@ -9,7 +9,10 @@ import 'package:t_app/features/chat/data/chat_conversation.dart';
 import 'package:t_app/features/chat/data/chat_message.dart';
 import 'package:t_app/features/chat/data/chat_socket_service.dart';
 import 'package:t_app/features/chat/data/chat_user.dart';
+import 'package:t_app/features/chat/data/shared_reel_message.dart';
 import 'package:t_app/features/chat/domain/chat_repository.dart';
+import 'package:t_app/features/home/presentation/cubits/home_cubit.dart';
+import 'package:t_app/features/reels/presentation/cubits/reels_cubit.dart';
 import 'package:t_app/features/chat/presentation/cubit/chat_thread_cubit.dart';
 import 'package:t_app/features/chat/presentation/cubit/chat_thread_state.dart';
 
@@ -87,6 +90,14 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     ).showSnackBar(SnackBar(content: Text(errorMessage)));
   }
 
+  void _handleOpenSharedReel(String reelId) {
+    final homeCubit = context.read<HomeCubit>();
+    final reelsCubit = context.read<ReelsCubit>();
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    homeCubit.changeTab(2);
+    unawaited(reelsCubit.focusOnReel(reelId));
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider.value(
@@ -107,6 +118,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                     child: _ConversationBody(
                       state: state,
                       onDeleteMessage: _handleDeleteMessage,
+                      onOpenSharedReel: _handleOpenSharedReel,
                     ),
                   ),
                 ],
@@ -249,28 +261,82 @@ class _MoreButton extends StatelessWidget {
   }
 }
 
-class _ConversationBody extends StatelessWidget {
-  const _ConversationBody({required this.state, required this.onDeleteMessage});
+class _ConversationBody extends StatefulWidget {
+  const _ConversationBody({
+    required this.state,
+    required this.onDeleteMessage,
+    required this.onOpenSharedReel,
+  });
 
   final ChatThreadState state;
   final ValueChanged<ChatMessage> onDeleteMessage;
+  final ValueChanged<String> onOpenSharedReel;
+
+  @override
+  State<_ConversationBody> createState() => _ConversationBodyState();
+}
+
+class _ConversationBodyState extends State<_ConversationBody> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    if (maxScroll - currentScroll <= 100) {
+      context.read<ChatThreadCubit>().loadOlderMessages();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _ConversationBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.state.isLoadingOlder &&
+        !widget.state.isLoadingOlder &&
+        widget.state.messages.length > oldWidget.state.messages.length) {
+      if (_scrollController.hasClients) {
+        final oldMaxScroll = _scrollController.position.maxScrollExtent;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_scrollController.hasClients) return;
+          final newMaxScroll = _scrollController.position.maxScrollExtent;
+          if (newMaxScroll > oldMaxScroll) {
+            final diff = newMaxScroll - oldMaxScroll;
+            _scrollController.jumpTo(_scrollController.offset + diff);
+          }
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (state.status == ChatThreadStatus.loading) {
+    if (widget.state.status == ChatThreadStatus.loading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (state.status == ChatThreadStatus.failure && state.messages.isEmpty) {
+    if (widget.state.status == ChatThreadStatus.failure && widget.state.messages.isEmpty) {
       return Center(
         child: Text(
-          state.errorMessage ?? 'Không thể tải tin nhắn.',
+          widget.state.errorMessage ?? 'Không thể tải tin nhắn.',
           style: ChatThreadTokens.profileMeta(context),
         ),
       );
     }
 
-    if (state.messages.isEmpty) {
+    if (widget.state.messages.isEmpty) {
       return Center(
         child: Text(
           'Chưa có tin nhắn nào.',
@@ -280,51 +346,77 @@ class _ConversationBody extends StatelessWidget {
     }
 
     String? lastMineId;
-    for (final message in state.messages) {
-      if (message.sender.id == state.currentUserId) {
+    for (final message in widget.state.messages) {
+      if (message.sender.id == widget.state.currentUserId) {
         lastMineId = message.id;
         break;
       }
     }
 
+    final showLoadingIndicator = widget.state.hasMoreOlder || widget.state.isLoadingOlder;
+    final totalItemsCount = widget.state.messages.length + (showLoadingIndicator ? 1 : 0);
+
     return Column(
       children: [
         Expanded(
           child: ListView.builder(
+            controller: _scrollController,
             reverse: true,
             padding: const EdgeInsets.only(
               bottom: ChatThreadTokens.bodyBottomGap,
             ),
-            itemCount: state.messages.length,
+            itemCount: totalItemsCount,
             itemBuilder: (context, index) {
-              final message = state.messages[index];
-              final isMine = message.sender.id == state.currentUserId;
+              if (showLoadingIndicator && index == widget.state.messages.length) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
+                    child: widget.state.isLoadingOlder
+                        ? const CircularProgressIndicator()
+                        : const SizedBox.shrink(),
+                  ),
+                );
+              }
+
+              final message = widget.state.messages[index];
+              final isMine = message.sender.id == widget.state.currentUserId;
               return Padding(
                 padding: const EdgeInsets.only(top: 12),
                 child: isMine
                     ? _OutgoingMessage(
                         message: message,
                         showStatus: message.id == lastMineId,
-                        onLongPress: () => onDeleteMessage(message),
+                        onLongPress: () => widget.onDeleteMessage(message),
+                        onOpenSharedReel: widget.onOpenSharedReel,
                       )
-                    : _IncomingMessage(message: message),
+                    : _IncomingMessage(
+                        message: message,
+                        onOpenSharedReel: widget.onOpenSharedReel,
+                      ),
               );
             },
           ),
         ),
-        _TypingIndicator(typingUsers: state.typingUsers),
+        _TypingIndicator(typingUsers: widget.state.typingUsers),
       ],
     );
   }
 }
 
+
 class _IncomingMessage extends StatelessWidget {
-  const _IncomingMessage({required this.message});
+  const _IncomingMessage({
+    required this.message,
+    required this.onOpenSharedReel,
+  });
 
   final ChatMessage message;
+  final ValueChanged<String> onOpenSharedReel;
 
   @override
   Widget build(BuildContext context) {
+    final sharedReel = tryDecodeSharedReelMessage(message.displayContent);
+
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: ChatThreadTokens.messageRowHorizontalPadding,
@@ -338,12 +430,18 @@ class _IncomingMessage extends StatelessWidget {
           ),
           const SizedBox(width: ChatThreadTokens.incomingBubbleGap),
           Flexible(
-            child: _Bubble(
-              text: message.displayContent,
-              backgroundColor: ChatThreadTokens.incomingBubble(context),
-              textStyle: ChatThreadTokens.message(context),
-              borderRadius: ChatThreadTokens.incomingBubbleBorderRadius,
-            ),
+            child: sharedReel != null
+                ? _SharedReelBubble(
+                    reel: sharedReel,
+                    isMine: false,
+                    onTap: () => onOpenSharedReel(sharedReel.reelId),
+                  )
+                : _Bubble(
+                    text: message.displayContent,
+                    backgroundColor: ChatThreadTokens.incomingBubble(context),
+                    textStyle: ChatThreadTokens.message(context),
+                    borderRadius: ChatThreadTokens.incomingBubbleBorderRadius,
+                  ),
           ),
         ],
       ),
@@ -356,14 +454,18 @@ class _OutgoingMessage extends StatelessWidget {
     required this.message,
     required this.showStatus,
     required this.onLongPress,
+    required this.onOpenSharedReel,
   });
 
   final ChatMessage message;
   final bool showStatus;
   final VoidCallback onLongPress;
+  final ValueChanged<String> onOpenSharedReel;
 
   @override
   Widget build(BuildContext context) {
+    final sharedReel = tryDecodeSharedReelMessage(message.displayContent);
+
     return Padding(
       padding: const EdgeInsets.only(
         left: 80,
@@ -374,12 +476,18 @@ class _OutgoingMessage extends StatelessWidget {
         children: [
           GestureDetector(
             onLongPress: onLongPress,
-            child: _Bubble(
-              text: message.displayContent,
-              backgroundColor: ChatThreadTokens.outgoingBubble(context),
-              textStyle: ChatThreadTokens.outgoingMessage(context),
-              borderRadius: ChatThreadTokens.outgoingBubbleBorderRadius,
-            ),
+            child: sharedReel != null
+                ? _SharedReelBubble(
+                    reel: sharedReel,
+                    isMine: true,
+                    onTap: () => onOpenSharedReel(sharedReel.reelId),
+                  )
+                : _Bubble(
+                    text: message.displayContent,
+                    backgroundColor: ChatThreadTokens.outgoingBubble(context),
+                    textStyle: ChatThreadTokens.outgoingMessage(context),
+                    borderRadius: ChatThreadTokens.outgoingBubbleBorderRadius,
+                  ),
           ),
           if (showStatus) ...[
             const SizedBox(height: 4),
@@ -400,6 +508,149 @@ class _OutgoingMessage extends StatelessWidget {
       MessageDeliveryStatus.seen => 'Đã xem',
       MessageDeliveryStatus.failed => 'Gửi lỗi',
     };
+  }
+}
+
+class _SharedReelBubble extends StatelessWidget {
+  const _SharedReelBubble({
+    required this.reel,
+    required this.isMine,
+    required this.onTap,
+  });
+
+  final SharedReelMessage reel;
+  final bool isMine;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final backgroundColor = isMine
+        ? ChatThreadTokens.outgoingBubble(context)
+        : ChatThreadTokens.incomingBubble(context);
+    final textColor = isMine
+        ? ChatThreadTokens.outgoingMessage(context).color
+        : ChatThreadTokens.message(context).color;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 220,
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: isMine
+              ? ChatThreadTokens.outgoingBubbleBorderRadius
+              : ChatThreadTokens.incomingBubbleBorderRadius,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(22),
+              ),
+              child: Container(
+                height: 184,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0xFF252525), Color(0xFF070707)],
+                  ),
+                ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Positioned(
+                      top: 14,
+                      left: 14,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircleAvatar(
+                            radius: 12,
+                            backgroundColor: Colors.white12,
+                            backgroundImage:
+                                reel.avatarUrl != null && reel.avatarUrl!.isNotEmpty
+                                ? NetworkImage(reel.avatarUrl!)
+                                : null,
+                            child: reel.avatarUrl == null || reel.avatarUrl!.isEmpty
+                                ? Text(
+                                    reel.username.isEmpty
+                                        ? '?'
+                                        : reel.username[0].toUpperCase(),
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              reel.username,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Center(
+                      child: Icon(
+                        Icons.play_circle_fill_rounded,
+                        color: Colors.white,
+                        size: 46,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    reel.username,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: textColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    reel.caption.isEmpty ? 'Tap to open reel' : reel.caption,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: textColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

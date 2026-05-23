@@ -11,13 +11,16 @@ class AuthUser extends Equatable {
   });
 
   factory AuthUser.fromJson(Map<String, dynamic> json) {
+    final rawAvatarUrl =
+        json['avatarUrl'] ?? json['avatar_url'] ?? json['avatar'];
+
     return AuthUser(
       id: json['id'] as String,
       email: json['email'] as String? ?? '',
       username: json['username'] as String,
       displayName: json['displayName'] as String? ?? json['username'] as String,
       avatarUrl: BackendUrlNormalizer.normalizeNullable(
-        json['avatarUrl'] as String?,
+        rawAvatarUrl as String?,
       ),
     );
   }

@@ -11,12 +11,22 @@ class AvatarView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final backgroundColor = Theme.of(context).colorScheme.surfaceContainerHigh;
+    final fontSize = radius * 0.9;
+    final fallbackChild = Text(
+      _initials,
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+            fontSize: fontSize,
+            height: 1.0,
+          ),
+    );
 
     if (user.avatarAssetPath != null) {
       return CircleAvatar(
         radius: radius,
         backgroundColor: backgroundColor,
-        backgroundImage: AssetImage(user.avatarAssetPath!),
+        foregroundImage: AssetImage(user.avatarAssetPath!),
+        child: fallbackChild,
       );
     }
 
@@ -24,19 +34,29 @@ class AvatarView extends StatelessWidget {
       return CircleAvatar(
         radius: radius,
         backgroundColor: backgroundColor,
-        backgroundImage: NetworkImage(user.avatarUrl!),
+        foregroundImage: NetworkImage(user.avatarUrl!),
+        child: fallbackChild,
       );
     }
 
     return CircleAvatar(
       radius: radius,
       backgroundColor: backgroundColor,
-      child: Text(
-        user.name.isEmpty ? '?' : user.name.characters.first.toUpperCase(),
-        style: Theme.of(
-          context,
-        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-      ),
+      child: fallbackChild,
     );
+  }
+
+  String get _initials {
+    final trimmedUsername = user.username.trim();
+    if (trimmedUsername.isNotEmpty) {
+      return trimmedUsername.characters.first.toUpperCase();
+    }
+
+    final trimmedName = user.name.trim();
+    if (trimmedName.isNotEmpty) {
+      return trimmedName.characters.first.toUpperCase();
+    }
+
+    return '?';
   }
 }
