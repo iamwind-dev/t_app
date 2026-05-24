@@ -26,7 +26,7 @@ class ReelModel extends Reel {
             ?.whereType<String>()
             .toList(growable: false) ??
         const <String>[];
-    final videoUrl = BackendUrlNormalizer.normalize(
+    final videoUrl = BackendUrlNormalizer.normalizeVideoPlayback(
       json['videoUrl'] as String? ?? _pickVideoUrl(mediaUrls),
     );
 
@@ -85,6 +85,7 @@ class ReelModel extends Reel {
     return normalized.endsWith('.mp4') ||
         normalized.endsWith('.mov') ||
         normalized.endsWith('.webm') ||
-        normalized.endsWith('.m4v');
+        normalized.endsWith('.m4v') ||
+        normalized.contains('/video/upload/');
   }
 }

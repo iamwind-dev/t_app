@@ -6,6 +6,9 @@ import '../../domain/usecases/get_reels.dart';
 import 'reels_state.dart';
 
 class ReelsCubit extends Cubit<ReelsState> {
+  static const int _visibleBatchSize = 3;
+  static const int _feedPageSize = 20;
+
   ReelsCubit({
     required GetReels getReels,
     required ReelsRepository repository,
@@ -15,16 +18,68 @@ class ReelsCubit extends Cubit<ReelsState> {
 
   final GetReels _getReels;
   final ReelsRepository _repository;
+  final List<Reel> _bufferedReels = [];
+  String? _nextCursor;
+  bool _hasNextPage = true;
+  bool _isLoadingMore = false;
+  bool _isRefreshing = false;
 
   Future<void> loadReels() async {
     try {
       emit(const ReelsLoading());
-
-      final reels = await _getReels();
+      _resetPagination();
+      final reels = await _pullNextBatch();
 
       emit(ReelsLoaded(reels));
     } catch (_) {
       emit(const ReelsError('Cannot load reels.'));
+    }
+  }
+
+  Future<void> loadMoreReels() async {
+    final currentState = state;
+    if (currentState is! ReelsLoaded || _isLoadingMore) {
+      return;
+    }
+
+    if (!_hasNextPage && _bufferedReels.isEmpty) {
+      return;
+    }
+
+    _isLoadingMore = true;
+    try {
+      final nextBatch = await _pullNextBatch(
+        excludeIds: currentState.reels.map((reel) => reel.id).toSet(),
+      );
+      if (nextBatch.isEmpty) {
+        return;
+      }
+
+      emit(ReelsLoaded([
+        ...currentState.reels,
+        ...nextBatch,
+      ]));
+    } catch (_) {
+      // Keep current feed when pagination fails.
+    } finally {
+      _isLoadingMore = false;
+    }
+  }
+
+  Future<void> refreshReels() async {
+    if (_isRefreshing) {
+      return;
+    }
+
+    _isRefreshing = true;
+    try {
+      _resetPagination();
+      final reels = await _pullNextBatch();
+      emit(ReelsLoaded(reels));
+    } catch (_) {
+      emit(const ReelsError('Cannot load reels.'));
+    } finally {
+      _isRefreshing = false;
     }
   }
 
@@ -168,5 +223,58 @@ class ReelsCubit extends Cubit<ReelsState> {
     }).toList(growable: false);
 
     emit(ReelsLoaded(nextReels));
+  }
+
+  void _resetPagination() {
+    _bufferedReels.clear();
+    _nextCursor = null;
+    _hasNextPage = true;
+    _isLoadingMore = false;
+  }
+
+  Future<List<Reel>> _pullNextBatch({
+    Set<String> excludeIds = const <String>{},
+  }) async {
+    final batch = <Reel>[];
+    final seenIds = {...excludeIds};
+
+    while (batch.length < _visibleBatchSize) {
+      while (_bufferedReels.isNotEmpty && batch.length < _visibleBatchSize) {
+        final reel = _bufferedReels.removeAt(0);
+        if (seenIds.add(reel.id)) {
+          batch.add(reel);
+        }
+      }
+
+      if (batch.length >= _visibleBatchSize) {
+        break;
+      }
+
+      if (!_hasNextPage) {
+        break;
+      }
+
+      final chunk = await _getReels.chunk(
+        cursor: _nextCursor,
+        limit: _feedPageSize,
+      );
+      _nextCursor = chunk.nextCursor;
+      _hasNextPage = chunk.hasNextPage;
+
+      if (chunk.reels.isEmpty) {
+        if (!_hasNextPage) {
+          break;
+        }
+        continue;
+      }
+
+      for (final reel in chunk.reels) {
+        if (!seenIds.contains(reel.id)) {
+          _bufferedReels.add(reel);
+        }
+      }
+    }
+
+    return batch;
   }
 }

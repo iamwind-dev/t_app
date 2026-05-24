@@ -5,14 +5,71 @@ import 'package:t_app/features/reels/presentation/cubits/reels_state.dart';
 import 'package:t_app/features/reels/presentation/widget/reel_overlay.dart';
 import 'package:t_app/features/reels/presentation/widget/reel_video_player.dart';
 
-class ReelsPage extends StatelessWidget {
+class ReelsPage extends StatefulWidget {
   const ReelsPage({super.key, required this.bottomPadding});
 
   final double bottomPadding;
 
   @override
+  State<ReelsPage> createState() => _ReelsPageState();
+}
+
+class _ReelsPageState extends State<ReelsPage> {
+  late final PageController _pageController;
+  bool _isRefreshingFromTop = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _refreshFromTop() async {
+    if (_isRefreshingFromTop) {
+      return;
+    }
+
+    _isRefreshingFromTop = true;
+    try {
+      await context.read<ReelsCubit>().refreshReels();
+      if (_pageController.hasClients) {
+        await _pageController.animateToPage(
+          0,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    } finally {
+      _isRefreshingFromTop = false;
+    }
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) {
+      return false;
+    }
+
+    final isAtTop = !_pageController.hasClients ||
+        (_pageController.page?.round() ?? _pageController.initialPage) == 0;
+    if (isAtTop &&
+        notification is OverscrollNotification &&
+        notification.overscroll < 0) {
+      _refreshFromTop();
+    }
+
+    return false;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final overlayBottomInset = (bottomPadding - 12).clamp(0.0, double.infinity);
+    final overlayBottomInset =
+        (widget.bottomPadding - 12).clamp(0.0, double.infinity);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -45,26 +102,35 @@ class ReelsPage extends StatelessWidget {
                   );
                 }
 
-                return PageView.builder(
-                  scrollDirection: Axis.vertical,
-                  itemCount: state.reels.length,
-                  itemBuilder: (context, index) {
-                    final reel = state.reels[index];
+                return NotificationListener<ScrollNotification>(
+                  onNotification: _handleScrollNotification,
+                  child: PageView.builder(
+                    controller: _pageController,
+                    scrollDirection: Axis.vertical,
+                    itemCount: state.reels.length,
+                    onPageChanged: (index) {
+                      if (index == state.reels.length - 1) {
+                        context.read<ReelsCubit>().loadMoreReels();
+                      }
+                    },
+                    itemBuilder: (context, index) {
+                      final reel = state.reels[index];
 
-                    return Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        ReelVideoPlayer(videoUrl: reel.videoUrl),
-                        ReelOverlay(
-                          reel: reel,
-                          bottomInset: overlayBottomInset,
-                          onLike: () {
-                            context.read<ReelsCubit>().toggleLike(reel.id);
-                          },
-                        ),
-                      ],
-                    );
-                  },
+                      return Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          ReelVideoPlayer(videoUrl: reel.videoUrl),
+                          ReelOverlay(
+                            reel: reel,
+                            bottomInset: overlayBottomInset,
+                            onLike: () {
+                              context.read<ReelsCubit>().toggleLike(reel.id);
+                            },
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                 );
               }
 

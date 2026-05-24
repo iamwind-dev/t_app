@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:t_app/core/network/backend_url_normalizer.dart';
 import 'package:video_player/video_player.dart';
 
 class ReelVideoPlayer extends StatefulWidget {
@@ -22,7 +23,7 @@ class _ReelVideoPlayerState extends State<ReelVideoPlayer> {
     super.initState();
 
     _controller = VideoPlayerController.networkUrl(
-      Uri.parse(widget.videoUrl),
+      Uri.parse(BackendUrlNormalizer.normalizeVideoPlayback(widget.videoUrl)),
     )
       ..initialize().then((_) {
         if (!mounted) return;
