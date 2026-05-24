@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -7,9 +8,11 @@ import 'package:t_app/core/network/api_exception.dart';
 import 'package:t_app/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:t_app/features/post_detail/data/models/user.dart';
 import 'package:t_app/features/post_detail/presentation/widget/avatar_view.dart';
+import 'package:t_app/features/reels/presentation/reel_video_constraints.dart';
 import 'package:t_app/features/reels/presentation/cubits/reels_cubit.dart';
 import 'package:t_app/features/uploads/data/upload_video_result.dart';
 import 'package:t_app/features/uploads/domain/uploads_image_repository.dart';
+import 'package:video_player/video_player.dart';
 
 Future<void> showCreateReelSheet(BuildContext context) {
   final uploadsRepository = context.read<UploadsImageRepository>();
@@ -103,6 +106,14 @@ class _CreateReelSheetState extends State<CreateReelSheet> {
       return;
     }
 
+    final durationError = await _validatePickedVideoDuration(picked);
+    if (!mounted || durationError != null) {
+      if (durationError != null) {
+        _showError(durationError);
+      }
+      return;
+    }
+
     final bytes = await picked.readAsBytes();
     if (!mounted) {
       return;
@@ -113,6 +124,19 @@ class _CreateReelSheetState extends State<CreateReelSheet> {
       _selectedBytes = bytes;
       _selectedContentType = picked.mimeType ?? _videoContentType(picked.name);
     });
+  }
+
+  Future<String?> _validatePickedVideoDuration(XFile video) async {
+    final controller = VideoPlayerController.file(File(video.path));
+
+    try {
+      await controller.initialize();
+      return validateReelVideoDuration(controller.value.duration);
+    } catch (_) {
+      return 'Cannot read selected video.';
+    } finally {
+      await controller.dispose();
+    }
   }
 
   Future<void> _submit() async {
@@ -447,7 +471,7 @@ class _VideoSelectionCard extends StatelessWidget {
                       Text(
                         hasVideo
                             ? fileName!
-                            : 'Upload from gallery to create a reel.',
+                            : 'Upload from gallery to create a reel up to 60 seconds.',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodyMedium?.copyWith(
@@ -510,7 +534,9 @@ class _CreateReelFooter extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            hasVideo ? 'Cloud upload enabled' : 'Choose a video to continue',
+            hasVideo
+                ? 'Cloud upload enabled'
+                : 'Choose a video up to 60 seconds',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
