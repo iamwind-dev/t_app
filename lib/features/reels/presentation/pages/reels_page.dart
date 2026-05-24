@@ -17,6 +17,7 @@ class ReelsPage extends StatefulWidget {
 class _ReelsPageState extends State<ReelsPage> {
   late final PageController _pageController;
   bool _isRefreshingFromTop = false;
+  int _currentPageIndex = 0;
 
   @override
   void initState() {
@@ -109,6 +110,11 @@ class _ReelsPageState extends State<ReelsPage> {
                     scrollDirection: Axis.vertical,
                     itemCount: state.reels.length,
                     onPageChanged: (index) {
+                      if (_currentPageIndex != index) {
+                        setState(() {
+                          _currentPageIndex = index;
+                        });
+                      }
                       if (index == state.reels.length - 1) {
                         context.read<ReelsCubit>().loadMoreReels();
                       }
@@ -119,7 +125,11 @@ class _ReelsPageState extends State<ReelsPage> {
                       return Stack(
                         fit: StackFit.expand,
                         children: [
-                          ReelVideoPlayer(videoUrl: reel.videoUrl),
+                          ReelVideoPlayer(
+                            key: ValueKey('reel-player-${reel.id}'),
+                            videoUrl: reel.videoUrl,
+                            isActive: index == _currentPageIndex,
+                          ),
                           ReelOverlay(
                             reel: reel,
                             bottomInset: overlayBottomInset,

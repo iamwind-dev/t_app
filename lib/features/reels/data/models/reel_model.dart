@@ -86,6 +86,7 @@ class ReelModel extends Reel {
         normalized.endsWith('.mov') ||
         normalized.endsWith('.webm') ||
         normalized.endsWith('.m4v') ||
-        normalized.contains('/video/upload/');
+        normalized.contains('/video/upload/') ||
+        url.toLowerCase().contains('player.cloudinary.com/embed/');
   }
 }

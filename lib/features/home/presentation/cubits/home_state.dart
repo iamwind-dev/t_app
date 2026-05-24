@@ -23,6 +23,7 @@ class HomeState extends Equatable {
     this.status = HomeFeedStatus.initial,
     this.currentUser = defaultCurrentUser,
     this.rootThreads = const [],
+    this.feedRenderVersion = 0,
     this.selectedTabIndex = 0,
     this.lastLoadedAtEpochMs,
     this.errorMessage,
@@ -35,6 +36,7 @@ class HomeState extends Equatable {
   final HomeFeedStatus status;
   final FeedUser currentUser;
   final List<ThreadItemModel> rootThreads;
+  final int feedRenderVersion;
   final int selectedTabIndex;
   final int? lastLoadedAtEpochMs;
   final String? errorMessage;
@@ -52,6 +54,7 @@ class HomeState extends Equatable {
     HomeFeedStatus? status,
     FeedUser? currentUser,
     List<ThreadItemModel>? rootThreads,
+    int? feedRenderVersion,
     int? selectedTabIndex,
     int? lastLoadedAtEpochMs,
     String? errorMessage,
@@ -66,6 +69,7 @@ class HomeState extends Equatable {
       status: status ?? this.status,
       currentUser: currentUser ?? this.currentUser,
       rootThreads: rootThreads ?? this.rootThreads,
+      feedRenderVersion: feedRenderVersion ?? this.feedRenderVersion,
       selectedTabIndex: selectedTabIndex ?? this.selectedTabIndex,
       lastLoadedAtEpochMs: lastLoadedAtEpochMs ?? this.lastLoadedAtEpochMs,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
@@ -81,6 +85,7 @@ class HomeState extends Equatable {
     status,
     currentUser,
     rootThreads,
+    feedRenderVersion,
     selectedTabIndex,
     lastLoadedAtEpochMs,
     errorMessage,

@@ -3,7 +3,7 @@ import 'package:t_app/core/config/app_config.dart';
 class BackendUrlNormalizer {
   const BackendUrlNormalizer._();
 
-  static const _cloudinaryAndroidVideoTransform = 'f_mp4,vc_h264,ac_aac,fl_progressive,q_auto';
+  static const _cloudinaryPlaybackVideoTransform = 'f_mp4,vc_h264,ac_aac';
 
   static Uri? get _baseUri => Uri.tryParse(AppConfig.apiBaseUrl);
 
@@ -44,6 +44,11 @@ class BackendUrlNormalizer {
       return normalizedUrl;
     }
 
+    final cloudinaryPlayerUrl = _cloudinaryPlayerToVideoUrl(uri);
+    if (cloudinaryPlayerUrl != null) {
+      return cloudinaryPlayerUrl;
+    }
+
     if (uri.host.toLowerCase() != 'res.cloudinary.com') {
       return normalizedUrl;
     }
@@ -54,20 +59,16 @@ class BackendUrlNormalizer {
       return normalizedUrl;
     }
 
-    final transformedSegments = List<String>.from(segments);
+    final transformedSegments = <String>[
+      ...segments.take(uploadIndex + 1),
+      _cloudinaryPlaybackVideoTransform,
+    ];
+
     final nextIndex = uploadIndex + 1;
     final hasExistingTransform =
-        nextIndex < transformedSegments.length &&
-        !transformedSegments[nextIndex].startsWith('v');
-
-    if (hasExistingTransform) {
-      if (!transformedSegments[nextIndex].contains('f_mp4')) {
-        transformedSegments[nextIndex] =
-            '${transformedSegments[nextIndex]},$_cloudinaryAndroidVideoTransform';
-      }
-    } else {
-      transformedSegments.insert(nextIndex, _cloudinaryAndroidVideoTransform);
-    }
+        nextIndex < segments.length && !segments[nextIndex].startsWith('v');
+    final remainingStartIndex = hasExistingTransform ? nextIndex + 1 : nextIndex;
+    transformedSegments.addAll(segments.skip(remainingStartIndex));
 
     final lastIndex = transformedSegments.length - 1;
     if (lastIndex >= 0) {
@@ -77,6 +78,93 @@ class BackendUrlNormalizer {
       transformedSegments[lastIndex] = '$baseName.mp4';
     }
 
-    return uri.replace(pathSegments: transformedSegments).toString();
+    return uri
+        .replace(
+          pathSegments: transformedSegments,
+          queryParameters: null,
+        )
+        .toString();
+  }
+
+  static List<String> videoPlaybackCandidates(String rawUrl) {
+    final normalized = normalize(rawUrl);
+    final playback = normalizeVideoPlayback(rawUrl);
+    final source = normalizeCloudinarySourceVideo(rawUrl);
+    final sourceWithoutExtension = normalizeCloudinarySourceVideo(
+      rawUrl,
+      removeExtension: true,
+    );
+    final candidates = <String>[
+      playback,
+      source,
+      sourceWithoutExtension,
+      normalized,
+      rawUrl,
+    ];
+
+    return candidates
+        .where((candidate) => candidate.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+  }
+
+  static String normalizeCloudinarySourceVideo(
+    String rawUrl, {
+    bool removeExtension = false,
+  }) {
+    final normalizedUrl = normalize(rawUrl);
+    final uri = Uri.tryParse(normalizedUrl);
+    if (uri == null || uri.host.toLowerCase() != 'res.cloudinary.com') {
+      return normalizedUrl;
+    }
+
+    final segments = uri.pathSegments.toList(growable: true);
+    final uploadIndex = segments.indexOf('upload');
+    if (uploadIndex < 0 || uploadIndex == 0) {
+      return normalizedUrl;
+    }
+
+    final nextIndex = uploadIndex + 1;
+    final hasExistingTransform =
+        nextIndex < segments.length && !segments[nextIndex].startsWith('v');
+    final sourceSegments = <String>[
+      ...segments.take(uploadIndex + 1),
+      ...segments.skip(hasExistingTransform ? nextIndex + 1 : nextIndex),
+    ];
+
+    if (removeExtension && sourceSegments.isNotEmpty) {
+      final lastIndex = sourceSegments.length - 1;
+      final fileName = sourceSegments[lastIndex];
+      final dotIndex = fileName.lastIndexOf('.');
+      if (dotIndex > 0) {
+        sourceSegments[lastIndex] = fileName.substring(0, dotIndex);
+      }
+    }
+
+    return uri.replace(
+      pathSegments: sourceSegments,
+      queryParameters: null,
+    ).toString();
+  }
+
+  static String? _cloudinaryPlayerToVideoUrl(Uri uri) {
+    if (uri.host.toLowerCase() != 'player.cloudinary.com') {
+      return null;
+    }
+
+    final cloudName = uri.queryParameters['cloud_name']?.trim();
+    final publicId = uri.queryParameters['public_id']?.trim();
+    if (cloudName == null ||
+        cloudName.isEmpty ||
+        publicId == null ||
+        publicId.isEmpty) {
+      return null;
+    }
+
+    final normalizedPublicId = publicId.replaceAll('%2F', '/');
+    return Uri.https(
+      'res.cloudinary.com',
+      '/$cloudName/video/upload/$_cloudinaryPlaybackVideoTransform/$normalizedPublicId.mp4',
+    ).toString();
   }
 }
