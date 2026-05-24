@@ -73,7 +73,7 @@ class CreateReelSheet extends StatefulWidget {
 }
 
 class _CreateReelSheetState extends State<CreateReelSheet> {
-  static const int _maxVideoBytes = 25 * 1024 * 1024;
+  static const int _maxVideoBytes = 100 * 1024 * 1024;
 
   final ImagePicker _picker = ImagePicker();
   late final TextEditingController _captionController;
@@ -102,7 +102,7 @@ class _CreateReelSheetState extends State<CreateReelSheet> {
 
     final fileSize = await picked.length();
     if (fileSize > _maxVideoBytes) {
-      _showError('Video must be smaller than 25MB.');
+      _showError('Video must be smaller than 100MB.');
       return;
     }
 
