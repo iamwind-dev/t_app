@@ -75,8 +75,6 @@ class HomeBottomTabBar extends StatelessWidget {
           final iconColor = isSelected
               ? AppIconTokens.navigationSelected(context)
               : AppIconTokens.navigationUnselected(context);
-          final reelsCreateIconColor =
-              AppIconTokens.navigationUnselected(context);
 
           return Expanded(
             child: GestureDetector(
@@ -90,7 +88,7 @@ class HomeBottomTabBar extends StatelessWidget {
                       ? Icon(
                           Icons.add_rounded,
                           size: 32,
-                          color: reelsCreateIconColor,
+                          color: iconColor,
                         )
                       : ImageIcon(
                           AssetImage(iconAsset),

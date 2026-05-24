@@ -33,6 +33,7 @@ class HomeCubit extends Cubit<HomeState> {
         state.copyWith(
           status: HomeFeedStatus.loaded,
           rootThreads: const MockThreadRepository().fetchRootThreads(),
+          feedRenderVersion: state.feedRenderVersion + 1,
           lastLoadedAtEpochMs: DateTime.now().millisecondsSinceEpoch,
           clearError: true,
           hasMore: false,
@@ -61,6 +62,7 @@ class HomeCubit extends Cubit<HomeState> {
         state.copyWith(
           status: HomeFeedStatus.loaded,
           rootThreads: hydratedThreads,
+          feedRenderVersion: state.feedRenderVersion + 1,
           nextCursor: page.pageInfo.nextCursor,
           hasMore: page.pageInfo.hasNextPage,
           lastLoadedAtEpochMs: DateTime.now().millisecondsSinceEpoch,
@@ -102,6 +104,7 @@ class HomeCubit extends Cubit<HomeState> {
           state.copyWith(
             status: HomeFeedStatus.loaded,
             rootThreads: const MockThreadRepository().fetchRootThreads(),
+            feedRenderVersion: state.feedRenderVersion + 1,
             lastLoadedAtEpochMs: DateTime.now().millisecondsSinceEpoch,
             clearError: true,
             hasMore: false,
@@ -120,6 +123,7 @@ class HomeCubit extends Cubit<HomeState> {
         state.copyWith(
           status: HomeFeedStatus.loaded,
           rootThreads: hydratedThreads,
+          feedRenderVersion: state.feedRenderVersion + 1,
           nextCursor: page.pageInfo.nextCursor,
           hasMore: page.pageInfo.hasNextPage,
           lastLoadedAtEpochMs: DateTime.now().millisecondsSinceEpoch,

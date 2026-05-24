@@ -301,34 +301,73 @@ class _MediaVideoState extends State<_MediaVideo> {
   }
 
   Future<void> _initialize() async {
-    try {
-      final normalizedPath = _isRemotePath(widget.path)
-          ? BackendUrlNormalizer.normalizeVideoPlayback(widget.path)
-          : widget.path;
-      final controller = _isRemotePath(widget.path)
-          ? VideoPlayerController.networkUrl(Uri.parse(normalizedPath))
-          : VideoPlayerController.asset(widget.path);
+    if (!_isRemotePath(widget.path)) {
+      try {
+        final controller = VideoPlayerController.asset(widget.path);
+        await controller.initialize();
+        await controller.setLooping(true);
+        await controller.setVolume(0);
 
-      await controller.initialize();
-      await controller.setLooping(true);
-      await controller.setVolume(0);
+        if (!mounted) {
+          await controller.dispose();
+          return;
+        }
 
-      if (!mounted) {
+        setState(() {
+          _controller = controller;
+        });
+      } catch (_) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _hasError = true;
+        });
+      }
+      return;
+    }
+
+    for (final candidate
+        in BackendUrlNormalizer.videoPlaybackCandidates(widget.path)) {
+      final controller = VideoPlayerController.networkUrl(Uri.parse(candidate));
+      try {
+        await controller.initialize();
+        await controller.setLooping(true);
+        await controller.setVolume(0);
+
+        if (!mounted) {
+          await controller.dispose();
+          return;
+        }
+
+        setState(() {
+          _controller = controller;
+          _hasError = false;
+        });
+        return;
+      } catch (_) {
         await controller.dispose();
-        return;
       }
+    }
 
-      setState(() {
-        _controller = controller;
-      });
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
+    if (!mounted) {
+      return;
+    }
 
-      setState(() {
-        _hasError = true;
-      });
+    setState(() {
+      _hasError = true;
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _MediaVideo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path) {
+      _controller?.dispose();
+      _controller = null;
+      _hasError = false;
+      _isPaused = true;
+      _initialize();
     }
   }
 
@@ -466,5 +505,6 @@ bool _isVideoPath(String path) {
       normalizedPath.endsWith('.mov') ||
       normalizedPath.endsWith('.m4v') ||
       normalizedPath.endsWith('.webm') ||
-      normalizedPath.contains('/video/upload/');
+      normalizedPath.contains('/video/upload/') ||
+      path.toLowerCase().contains('player.cloudinary.com/embed/');
 }

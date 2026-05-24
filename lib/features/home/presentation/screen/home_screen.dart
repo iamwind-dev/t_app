@@ -389,6 +389,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                             state.rootThreads[index - 1];
 
                                         return Padding(
+                                          key: ValueKey(
+                                            'home-post-${state.feedRenderVersion}-${rootThread.id}',
+                                          ),
                                           padding: const EdgeInsets.fromLTRB(
                                             0,
                                             14,
