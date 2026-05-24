@@ -12,11 +12,10 @@ class ReelsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final overlayBottomInset = (bottomPadding - 12).clamp(0.0, double.infinity);
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           BlocBuilder<ReelsCubit, ReelsState>(

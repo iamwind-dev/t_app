@@ -18,11 +18,13 @@ class HomeBottomTabBar extends StatelessWidget {
     required this.selectedIndex,
     required this.onTap,
     this.onReelsCreateTap,
+    this.backgroundColor,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onTap;
   final VoidCallback? onReelsCreateTap;
+  final Color? backgroundColor;
 
   static const double baseHeight = 60;
 
@@ -58,7 +60,7 @@ class HomeBottomTabBar extends StatelessWidget {
       height: baseHeight + bottomInset,
       padding: EdgeInsets.only(bottom: bottomInset),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: backgroundColor ?? colorScheme.surface,
         // border: Border(top: BorderSide(color: theme.dividerColor)),
       ),
       child: Row(
@@ -73,6 +75,8 @@ class HomeBottomTabBar extends StatelessWidget {
           final iconColor = isSelected
               ? AppIconTokens.navigationSelected(context)
               : AppIconTokens.navigationUnselected(context);
+          final reelsCreateIconColor =
+              AppIconTokens.navigationUnselected(context);
 
           return Expanded(
             child: GestureDetector(
@@ -86,7 +90,7 @@ class HomeBottomTabBar extends StatelessWidget {
                       ? Icon(
                           Icons.add_rounded,
                           size: 32,
-                          color: iconColor,
+                          color: reelsCreateIconColor,
                         )
                       : ImageIcon(
                           AssetImage(iconAsset),

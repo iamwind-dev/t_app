@@ -305,6 +305,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
           return Scaffold(
             body: SafeArea(
+              top: !isReelsTab,
               bottom: false,
               child: Stack(
                 children: [
@@ -446,6 +447,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             onTap: (index) =>
                                 _handleBottomTabTap(index, state),
                             onReelsCreateTap: _openCreateReelSheet,
+                            backgroundColor:
+                                isReelsTab ? Colors.transparent : null,
                           ),
                         ),
                       ),
