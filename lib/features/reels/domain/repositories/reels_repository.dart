@@ -1,9 +1,14 @@
 import '../entities/reel.dart';
 import '../entities/reel_comment.dart';
 import '../entities/reel_reaction_result.dart';
+import '../entities/reels_feed_chunk.dart';
 
 abstract class ReelsRepository {
   Future<List<Reel>> getReels();
+  Future<ReelsFeedChunk> getReelsChunk({
+    String? cursor,
+    int limit = 20,
+  });
   Future<Reel> getReelById(String reelId);
   Future<Reel> createReel({
     required String videoUrl,

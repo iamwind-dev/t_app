@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:t_app/core/network/backend_url_normalizer.dart';
 import 'package:video_player/video_player.dart';
 
 class ThreadMediaSection extends StatefulWidget {
@@ -301,8 +302,11 @@ class _MediaVideoState extends State<_MediaVideo> {
 
   Future<void> _initialize() async {
     try {
+      final normalizedPath = _isRemotePath(widget.path)
+          ? BackendUrlNormalizer.normalizeVideoPlayback(widget.path)
+          : widget.path;
       final controller = _isRemotePath(widget.path)
-          ? VideoPlayerController.networkUrl(Uri.parse(widget.path))
+          ? VideoPlayerController.networkUrl(Uri.parse(normalizedPath))
           : VideoPlayerController.asset(widget.path);
 
       await controller.initialize();
@@ -461,5 +465,6 @@ bool _isVideoPath(String path) {
   return normalizedPath.endsWith('.mp4') ||
       normalizedPath.endsWith('.mov') ||
       normalizedPath.endsWith('.m4v') ||
-      normalizedPath.endsWith('.webm');
+      normalizedPath.endsWith('.webm') ||
+      normalizedPath.contains('/video/upload/');
 }

@@ -3,6 +3,7 @@ import 'package:t_app/core/network/api_client.dart';
 import '../../domain/entities/reel.dart';
 import '../../domain/entities/reel_comment.dart';
 import '../../domain/entities/reel_reaction_result.dart';
+import '../../domain/entities/reels_feed_chunk.dart';
 import '../../domain/repositories/reels_repository.dart';
 import '../models/reel_comment_model.dart';
 import '../models/reel_model.dart';
@@ -15,21 +16,41 @@ class ReelsRepositoryImpl implements ReelsRepository {
 
   @override
   Future<List<Reel>> getReels() async {
+    final chunk = await getReelsChunk();
+    return chunk.reels;
+  }
+
+  @override
+  Future<ReelsFeedChunk> getReelsChunk({
+    String? cursor,
+    int limit = 20,
+  }) async {
     final response = await _apiClient.get<Map<String, dynamic>>(
       '/posts/feed',
+      queryParameters: {
+        if (cursor != null) 'cursor': cursor,
+        'limit': limit,
+      },
       decode: _asMap,
     );
 
     final items = response['items'];
-    if (items is! List) {
-      return const [];
-    }
-
-    return items
+    final reels = items is! List
+        ? const <Reel>[]
+        : items
         .whereType<Map<String, dynamic>>()
         .where(_hasVideoMedia)
         .map(ReelModel.fromJson)
         .toList(growable: false);
+
+    final pageInfo = response['pageInfo'];
+    final pageInfoMap = pageInfo is Map<String, dynamic> ? pageInfo : const <String, dynamic>{};
+
+    return ReelsFeedChunk(
+      reels: reels,
+      nextCursor: pageInfoMap['nextCursor'] as String?,
+      hasNextPage: pageInfoMap['hasNextPage'] as bool? ?? false,
+    );
   }
 
   @override
