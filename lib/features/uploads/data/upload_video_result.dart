@@ -22,8 +22,9 @@ class UploadVideoResult extends Equatable {
     return UploadVideoResult(
       url: url,
       publicId: publicId,
-      durationSeconds: json['durationSeconds'] as int?,
+      durationSeconds: (json['durationSeconds'] as num?)?.round(),
       moderation: _parseModeration(json['moderation']),
+
     );
   }
 

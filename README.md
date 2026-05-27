@@ -1,4 +1,4 @@
-# ogether App
+# Together App
 
 Flutter demo app mo phong giao dien social feed kieu Threads, hien co 2 luong chinh la `Home feed` va `Search`, kem theo chuyen theme sang `System/Light/Dark`.
 

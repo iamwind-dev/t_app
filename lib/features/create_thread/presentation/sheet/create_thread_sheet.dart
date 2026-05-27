@@ -3,15 +3,18 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:t_app/features/reels/presentation/sheet/create_reel_sheet.dart';
 import 'package:t_app/features/create_thread/data/models/thread_draft.dart';
 import 'package:t_app/features/create_thread/presentation/widget/ai_scanning_text.dart';
 import 'package:t_app/features/create_thread/presentation/widget/moderated_media_preview.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 import 'package:t_app/features/post_detail/data/models/user.dart';
 import 'package:t_app/features/post_detail/presentation/widget/avatar_view.dart';
+import 'package:t_app/features/post_detail/presentation/widget/thread_moderation_ui.dart';
 import 'package:t_app/features/uploads/data/upload_image_result.dart';
 import 'package:t_app/features/uploads/data/upload_moderation.dart';
 import 'package:t_app/features/uploads/domain/uploads_image_repository.dart';
+import 'package:t_app/features/posts/data/moderated_thread_submission.dart';
 
 enum ComposerMode { create, reply }
 
@@ -60,17 +63,19 @@ class ThreadComposerSubmitRequest {
 }
 
 typedef ThreadComposerSubmitCallback =
-    Future<void> Function(ThreadComposerSubmitRequest request);
+    Future<ModeratedThreadSubmission> Function(ThreadComposerSubmitRequest request);
 
 Future<void> showCreateThreadSheet({
   required BuildContext context,
   required User currentUser,
   ThreadComposerSubmitCallback? onSubmit,
+  void Function(ModeratedThreadSubmission)? onSubmissionAccepted,
 }) {
   return showThreadComposerSheet(
     context: context,
     currentUser: currentUser,
     onSubmit: onSubmit,
+    onSubmissionAccepted: onSubmissionAccepted,
   );
 }
 
@@ -80,6 +85,7 @@ Future<void> showThreadComposerSheet({
   ComposerMode mode = ComposerMode.create,
   ThreadComposerReplyContext? replyContext,
   ThreadComposerSubmitCallback? onSubmit,
+  void Function(ModeratedThreadSubmission)? onSubmissionAccepted,
 }) {
   final uploadsRepository = context.read<UploadsImageRepository>();
 
@@ -95,6 +101,7 @@ Future<void> showThreadComposerSheet({
         mode: mode,
         replyContext: replyContext,
         onSubmit: onSubmit,
+        onSubmissionAccepted: onSubmissionAccepted,
       );
     },
   );
@@ -110,6 +117,7 @@ class ThreadComposerSheet extends StatefulWidget {
     this.mode = ComposerMode.create,
     this.replyContext,
     this.onSubmit,
+    this.onSubmissionAccepted,
   });
 
   final User currentUser;
@@ -117,6 +125,7 @@ class ThreadComposerSheet extends StatefulWidget {
   final ComposerMode mode;
   final ThreadComposerReplyContext? replyContext;
   final ThreadComposerSubmitCallback? onSubmit;
+  final void Function(ModeratedThreadSubmission)? onSubmissionAccepted;
 
   @override
   State<ThreadComposerSheet> createState() => _ThreadComposerSheetState();
@@ -334,6 +343,14 @@ class _ThreadComposerSheetState extends State<ThreadComposerSheet>
     });
   }
 
+  void _openCreateReelFlow() {
+    final rootContext = Navigator.of(context, rootNavigator: true).context;
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      showCreateReelSheet(rootContext);
+    });
+  }
+
   /// Uploads staged media first, then delegates the final post or reply submit.
   Future<void> _submit() async {
     if (_postState != PostState.idle) {
@@ -377,8 +394,9 @@ class _ThreadComposerSheetState extends State<ThreadComposerSheet>
         return;
       }
 
+      ModeratedThreadSubmission? submission;
       if (widget.onSubmit != null) {
-        await widget.onSubmit!(
+        submission = await widget.onSubmit!(
           ThreadComposerSubmitRequest(
             mode: widget.mode,
             items: items,
@@ -387,29 +405,91 @@ class _ThreadComposerSheetState extends State<ThreadComposerSheet>
           ),
         );
       }
-
-      setState(() {
-        _postState = PostState.postingSuccess;
-      });
-
-      await Future<void>.delayed(const Duration(milliseconds: 1200));
-      if (!mounted) {
+      if (submission == null) {
+        _resetComposerState();
         return;
       }
-      Navigator.of(context).pop();
+
+      await _handleSubmissionResult(submission);
     } catch (_) {
       if (!mounted) {
         return;
       }
-      setState(() {
-        _postState = PostState.idle;
-      });
+      _resetComposerState();
       _showSubmitError(
         _imageAttachments.isNotEmpty
             ? 'Khong the tai anh len luc nay.'
             : 'Khong the dang bai luc nay.',
       );
     }
+  }
+
+  /// Routes the backend moderation decision into the appropriate composer UX.
+  Future<void> _handleSubmissionResult(ModeratedThreadSubmission submission) async {
+    final moderation = submission.moderation;
+    if (moderation?.isAiUnavailable == true) {
+      _showSubmitError('AI moderation unavailable');
+    }
+
+    if (moderation == null ||
+        (moderation.action == 'ALLOW' && moderation.isWarning == false)) {
+      await _acceptSubmission(submission);
+      return;
+    }
+
+    if (moderation.shouldWarnUser ||
+        moderation.isWarning ||
+        moderation.shouldBlockOrReview) {
+      final acceptedByUi = await showModerationWarningDialog(
+        context,
+        moderation,
+      );
+      if (!mounted) {
+        return;
+      }
+
+      if (acceptedByUi) {
+        await _acceptSubmission(submission);
+        return;
+      }
+
+      _resetComposerState();
+      return;
+    }
+
+    await _acceptSubmission(submission);
+  }
+
+  /// Finalizes a submission only after the moderation UX has been resolved.
+  Future<void> _acceptSubmission(ModeratedThreadSubmission submission) async {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _postState = PostState.postingSuccess;
+    });
+
+    if (widget.onSubmissionAccepted != null) {
+      widget.onSubmissionAccepted!(submission);
+    }
+
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pop();
+  }
+
+  /// Restores the composer to editable mode without clearing the draft.
+  void _resetComposerState() {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _postState = PostState.idle;
+    });
   }
 
   @override
@@ -453,6 +533,7 @@ class _ThreadComposerSheetState extends State<ThreadComposerSheet>
                     imageAttachments: _imageAttachments,
                     onPickImages: _pickImages,
                     onRemoveImageAttachment: _removeImageAttachmentAt,
+                    onPickVideo: _openCreateReelFlow,
                     postState: _postState,
                     scanController: _scanController,
                     mode: widget.mode,
@@ -544,7 +625,6 @@ class ThreadComposerHeader extends StatelessWidget {
 
 class _ThreadDraftComposer extends StatelessWidget {
   const _ThreadDraftComposer({
-    super.key,
     required this.currentUser,
     required this.draft,
     required this.controllers,
@@ -554,6 +634,7 @@ class _ThreadDraftComposer extends StatelessWidget {
     required this.imageAttachments,
     required this.onPickImages,
     required this.onRemoveImageAttachment,
+    required this.onPickVideo,
     required this.postState,
     required this.scanController,
     required this.mode,
@@ -569,6 +650,7 @@ class _ThreadDraftComposer extends StatelessWidget {
   final List<_ComposerImageAttachment> imageAttachments;
   final Future<void> Function() onPickImages;
   final void Function(int index) onRemoveImageAttachment;
+  final VoidCallback onPickVideo;
   final PostState postState;
   final AnimationController scanController;
   final ComposerMode mode;
@@ -594,6 +676,7 @@ class _ThreadDraftComposer extends StatelessWidget {
             onAddToThread: onAddToThread,
             imageAttachments: imageAttachments,
             onPickImages: onPickImages,
+            onPickVideo: onPickVideo,
             onRemoveImageAttachment: onRemoveImageAttachment,
             postState: postState,
             scanController: scanController,
@@ -681,7 +764,6 @@ class ReplyContextPreview extends StatelessWidget {
 
 class _ThreadDraftItemComposer extends StatelessWidget {
   const _ThreadDraftItemComposer({
-    super.key,
     required this.currentUser,
     required this.controller,
     required this.focusNode,
@@ -691,6 +773,7 @@ class _ThreadDraftItemComposer extends StatelessWidget {
     required this.onAddToThread,
     required this.imageAttachments,
     required this.onPickImages,
+    required this.onPickVideo,
     required this.onRemoveImageAttachment,
     required this.postState,
     required this.scanController,
@@ -706,6 +789,7 @@ class _ThreadDraftItemComposer extends StatelessWidget {
   final VoidCallback onAddToThread;
   final List<_ComposerImageAttachment> imageAttachments;
   final Future<void> Function() onPickImages;
+  final VoidCallback onPickVideo;
   final void Function(int index) onRemoveImageAttachment;
   final PostState postState;
   final AnimationController scanController;
@@ -743,12 +827,9 @@ class _ThreadDraftItemComposer extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
-                  CircleAvatar(
+                  AvatarView(
+                    user: currentUser,
                     radius: smallAvatarRadius,
-                    backgroundColor: colorScheme.surfaceContainerHighest,
-                    backgroundImage: currentUser.avatarAssetPath == null
-                        ? null
-                        : AssetImage(currentUser.avatarAssetPath!),
                   ),
                 ],
               ],
@@ -803,7 +884,10 @@ class _ThreadDraftItemComposer extends StatelessWidget {
                         ),
                 ),
                 const SizedBox(height: 12),
-                ComposerToolbar(onPickImages: onPickImages),
+                ComposerToolbar(
+                  onPickImages: onPickImages,
+                  onPickVideo: onPickVideo,
+                ),
                 if (showMediaComposer && imageAttachments.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   _ComposerImageStrip(
@@ -828,10 +912,15 @@ class _ThreadDraftItemComposer extends StatelessWidget {
 }
 
 class ComposerToolbar extends StatelessWidget {
-  const ComposerToolbar({super.key, required this.onPickImages});
+  const ComposerToolbar({
+    super.key,
+    required this.onPickImages,
+    required this.onPickVideo,
+  });
 
   static const _icons = [
     Icons.image_outlined,
+    Icons.video_library_outlined,
     Icons.gif_box_outlined,
     Icons.subject_rounded,
     Icons.format_quote_rounded,
@@ -839,6 +928,7 @@ class ComposerToolbar extends StatelessWidget {
   ];
 
   final Future<void> Function() onPickImages;
+  final VoidCallback onPickVideo;
 
   @override
   Widget build(BuildContext context) {
@@ -847,7 +937,11 @@ class ComposerToolbar extends StatelessWidget {
     return Row(
       children: List.generate(_icons.length, (index) {
         return GestureDetector(
-          onTap: index == 0 ? () => onPickImages() : null,
+          onTap: switch (index) {
+            0 => () => onPickImages(),
+            1 => onPickVideo,
+            _ => null,
+          },
           behavior: HitTestBehavior.opaque,
           child: Padding(
             padding: EdgeInsets.only(
@@ -867,7 +961,6 @@ class ComposerToolbar extends StatelessWidget {
 
 class _ComposerImageStrip extends StatelessWidget {
   const _ComposerImageStrip({
-    super.key,
     required this.attachments,
     required this.onRemoveImage,
   });
@@ -896,7 +989,6 @@ class _ComposerImageStrip extends StatelessWidget {
 
 class _ComposerImageCard extends StatelessWidget {
   const _ComposerImageCard({
-    super.key,
     required this.attachment,
     required this.onRemove,
   });
@@ -923,6 +1015,7 @@ class _ComposerImageCard extends StatelessWidget {
                 height: 92,
                 fit: BoxFit.cover,
               ),
+
             ),
           ),
         ),
@@ -971,12 +1064,9 @@ class AddToThreadRow extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Row(
         children: [
-          CircleAvatar(
+          AvatarView(
+            user: currentUser,
             radius: 11,
-            backgroundColor: colorScheme.surfaceContainerHighest,
-            backgroundImage: currentUser.avatarAssetPath == null
-                ? null
-                : AssetImage(currentUser.avatarAssetPath!),
           ),
           const SizedBox(width: 10),
           Text(

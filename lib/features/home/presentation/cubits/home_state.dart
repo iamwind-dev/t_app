@@ -23,34 +23,60 @@ class HomeState extends Equatable {
     this.status = HomeFeedStatus.initial,
     this.currentUser = defaultCurrentUser,
     this.rootThreads = const [],
+    this.feedRenderVersion = 0,
     this.selectedTabIndex = 0,
     this.lastLoadedAtEpochMs,
     this.errorMessage,
+    this.isLoadingMore = false,
+    this.hasMore = true,
+    this.nextCursor,
+    this.isRefreshing = false,
   });
 
   final HomeFeedStatus status;
   final FeedUser currentUser;
   final List<ThreadItemModel> rootThreads;
+  final int feedRenderVersion;
   final int selectedTabIndex;
   final int? lastLoadedAtEpochMs;
   final String? errorMessage;
+  final bool isLoadingMore;
+  final bool hasMore;
+  final String? nextCursor;
+  final bool isRefreshing;
+
+  bool get isInitialLoading =>
+      status == HomeFeedStatus.loading && rootThreads.isEmpty;
+  bool get isLoaded => status == HomeFeedStatus.loaded;
+  bool get hasError => status == HomeFeedStatus.failure;
 
   HomeState copyWith({
     HomeFeedStatus? status,
     FeedUser? currentUser,
     List<ThreadItemModel>? rootThreads,
+    int? feedRenderVersion,
     int? selectedTabIndex,
     int? lastLoadedAtEpochMs,
     String? errorMessage,
     bool clearError = false,
+    bool? isLoadingMore,
+    bool? hasMore,
+    String? nextCursor,
+    bool clearCursor = false,
+    bool? isRefreshing,
   }) {
     return HomeState(
       status: status ?? this.status,
       currentUser: currentUser ?? this.currentUser,
       rootThreads: rootThreads ?? this.rootThreads,
+      feedRenderVersion: feedRenderVersion ?? this.feedRenderVersion,
       selectedTabIndex: selectedTabIndex ?? this.selectedTabIndex,
       lastLoadedAtEpochMs: lastLoadedAtEpochMs ?? this.lastLoadedAtEpochMs,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      hasMore: hasMore ?? this.hasMore,
+      nextCursor: clearCursor ? null : nextCursor ?? this.nextCursor,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
     );
   }
 
@@ -59,8 +85,13 @@ class HomeState extends Equatable {
     status,
     currentUser,
     rootThreads,
+    feedRenderVersion,
     selectedTabIndex,
     lastLoadedAtEpochMs,
     errorMessage,
+    isLoadingMore,
+    hasMore,
+    nextCursor,
+    isRefreshing,
   ];
 }

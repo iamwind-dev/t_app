@@ -6,7 +6,6 @@ import 'package:t_app/features/chat/domain/chat_repository.dart';
 import 'package:t_app/features/chat/presentation/cubit/direct_conversation_cubit.dart';
 import 'package:t_app/features/chat/presentation/cubit/direct_conversation_state.dart';
 import 'package:t_app/features/chat/presentation/screen/chat_thread_screen.dart';
-import 'package:t_app/features/home/presentation/cubits/home_state.dart';
 import 'package:t_app/features/home/presentation/widget/create_post_card.dart';
 import 'package:t_app/features/home/presentation/widget/post_divider.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
@@ -231,7 +230,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
                       const SizedBox(height: 16),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: ProfileConnectionsSummary(
                           profile: profile,
                           followerPreviews: state.followerPreviews,
@@ -471,7 +470,7 @@ class ProfileHeaderSection extends StatelessWidget {
                 right: 0,
                 child: AvatarView(user: _profileToUser(profile), radius: 40),
               ),
-              if (isMe)
+              if (!isMe && !profile.isFollowing)
                 Positioned(
                   left: 0,
                   bottom: 14,
@@ -620,15 +619,17 @@ class ProfileConnectionsSummary extends StatelessWidget {
       fontWeight: FontWeight.w500,
     );
 
-    return Wrap(
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 10,
-      runSpacing: 6,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Wrap(
+      crossAxisAlignment: WrapCrossAlignment.start,
+      spacing: 1,
+      runSpacing: 1,
       children: [
         if (followerPreviews.isNotEmpty)
           SizedBox(
             width: 18.0 * (followerPreviews.length - 1) + 28,
-            height: 28,
+            height: 20,
             child: Stack(
               children: List.generate(followerPreviews.length, (index) {
                 return Positioned(
@@ -651,6 +652,7 @@ class ProfileConnectionsSummary extends StatelessWidget {
             ),
           ),
         ),
+        SizedBox(width: 10),
         InkWell(
           onTap: onFollowingTap,
           borderRadius: BorderRadius.circular(999),
@@ -663,6 +665,7 @@ class ProfileConnectionsSummary extends StatelessWidget {
           ),
         ),
       ],
+      ),
     );
   }
 }
@@ -736,7 +739,7 @@ class _FollowerAvatarBubble extends StatelessWidget {
     final hasAvatar = avatarUrl != null && avatarUrl!.trim().isNotEmpty;
 
     return CircleAvatar(
-      radius: 14,
+      radius: 10,
       backgroundColor: colorScheme.surface,
       child: CircleAvatar(
         radius: 12,
@@ -1276,10 +1279,17 @@ class ProfileComposerPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CreatePostCard(
-      currentUser: FeedUser(
-        username: profile.username,
-        avatarAsset: profile.avatarUrl,
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: CreatePostCard(
+        currentUser: User(
+          id: profile.id,
+          name: profile.displayName,
+          username: profile.username,
+          avatarUrl: profile.avatarUrl,
+        ),
+
       ),
     );
   }
@@ -1313,11 +1323,11 @@ class _ProfileThreadsTab extends StatelessWidget {
         final thread = threads[index - (isMe ? 1 : 0)];
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-          child: ThreadItemWidget(
-            thread: thread,
-            onTap: () => onThreadTap(thread),
+          child: ThreadPreviewBlock(
+            rootThread: thread,
+            onRootTap: () => onThreadTap(thread),
             onReplyTap: () => onThreadTap(thread),
-            showReplyHint: false,
+            onPreviewReplyTap: onThreadTap,
           ),
         );
       },

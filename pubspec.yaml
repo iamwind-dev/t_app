@@ -85,7 +85,6 @@ flutter:
     - assets/icons/
     - assets/icons/bottom/
     - assets/icons/search/
-    - .env
   fonts:
     - family: Roboto
       fonts:
@@ -93,6 +92,7 @@ flutter:
         - asset: assets/fonts/Roboto/Roboto-Medium.ttf
         - asset: assets/fonts/Roboto/Roboto-Bold.ttf
         - asset: assets/fonts/Roboto/Roboto-Thin.ttf
+  
   
 flutter_gen:
   output: lib/generated/
