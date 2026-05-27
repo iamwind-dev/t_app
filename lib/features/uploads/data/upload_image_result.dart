@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:t_app/core/network/backend_url_normalizer.dart';
+import 'package:t_app/features/uploads/data/upload_moderation.dart';
 
 enum UploadImageType {
   post('post'),
@@ -23,6 +24,7 @@ class UploadImageResult extends Equatable {
     required this.secureUrl,
     required this.publicId,
     required this.type,
+    this.moderation = UploadModeration.none,
   });
 
   factory UploadImageResult.fromJson(Map<String, dynamic> json) {
@@ -43,13 +45,23 @@ class UploadImageResult extends Equatable {
       secureUrl: BackendUrlNormalizer.normalize(secureUrl),
       publicId: publicId,
       type: UploadImageType.fromValue(typeValue),
+      moderation: _parseModeration(json['moderation']),
     );
   }
 
   final String secureUrl;
   final String publicId;
   final UploadImageType type;
+  final UploadModeration moderation;
 
   @override
-  List<Object?> get props => [secureUrl, publicId, type];
+  List<Object?> get props => [secureUrl, publicId, type, moderation];
+
+  static UploadModeration _parseModeration(Object? value) {
+    if (value is Map<String, dynamic>) {
+      return UploadModeration.fromJson(value);
+    }
+
+    return UploadModeration.none;
+  }
 }

@@ -6,11 +6,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:t_app/features/reels/presentation/sheet/create_reel_sheet.dart';
 import 'package:t_app/features/create_thread/data/models/thread_draft.dart';
 import 'package:t_app/features/create_thread/presentation/widget/ai_scanning_text.dart';
+import 'package:t_app/features/create_thread/presentation/widget/moderated_media_preview.dart';
 import 'package:t_app/features/post_detail/data/models/thread_item_model.dart';
 import 'package:t_app/features/post_detail/data/models/user.dart';
 import 'package:t_app/features/post_detail/presentation/widget/avatar_view.dart';
 import 'package:t_app/features/post_detail/presentation/widget/thread_moderation_ui.dart';
 import 'package:t_app/features/uploads/data/upload_image_result.dart';
+import 'package:t_app/features/uploads/data/upload_moderation.dart';
 import 'package:t_app/features/uploads/domain/uploads_image_repository.dart';
 import 'package:t_app/features/posts/data/moderated_thread_submission.dart';
 
@@ -256,15 +258,36 @@ class _ThreadComposerSheetState extends State<ThreadComposerSheet>
         ? UploadImageType.reply
         : UploadImageType.post;
     final urls = <String>[];
+    final nextAttachments = [..._imageAttachments];
 
-    for (final attachment in _imageAttachments) {
+    for (var i = 0; i < nextAttachments.length; i++) {
+      final attachment = nextAttachments[i];
       final upload = await widget.uploadsRepository.uploadImage(
         fileName: attachment.fileName,
         bytes: attachment.bytes,
         contentType: attachment.contentType,
         type: uploadType,
       );
+      nextAttachments[i] = attachment.copyWith(
+        moderation: upload.moderation,
+        uploadedUrl: upload.secureUrl,
+      );
+
+      if (upload.moderation.action == UploadModerationAction.block) {
+        _showSubmitError(upload.moderation.reason.isNotEmpty
+            ? upload.moderation.reason
+            : 'Nội dung bị chặn bởi hệ thống kiểm duyệt.');
+        continue;
+      }
       urls.add(upload.secureUrl);
+    }
+
+    if (mounted) {
+      setState(() {
+        _imageAttachments = nextAttachments
+            .where((item) => item.moderation.action != UploadModerationAction.block)
+            .toList(growable: false);
+      });
     }
 
     return urls;
@@ -981,13 +1004,18 @@ class _ComposerImageCard extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(18),
-          child: ColoredBox(
-            color: colorScheme.surfaceContainerLow,
-            child: Image.memory(
-              attachment.bytes,
-              width: 92,
-              height: 92,
-              fit: BoxFit.contain,
+          child: SizedBox(
+            width: 92,
+            height: 92,
+            child: ModeratedMediaPreview(
+              moderation: attachment.moderation,
+              child: Image.memory(
+                attachment.bytes,
+                width: 92,
+                height: 92,
+                fit: BoxFit.cover,
+              ),
+
             ),
           ),
         ),
@@ -1207,9 +1235,26 @@ class _ComposerImageAttachment {
     required this.fileName,
     required this.bytes,
     required this.contentType,
+    this.uploadedUrl,
+    this.moderation = UploadModeration.none,
   });
 
   final String fileName;
   final Uint8List bytes;
   final String contentType;
+  final String? uploadedUrl;
+  final UploadModeration moderation;
+
+  _ComposerImageAttachment copyWith({
+    String? uploadedUrl,
+    UploadModeration? moderation,
+  }) {
+    return _ComposerImageAttachment(
+      fileName: fileName,
+      bytes: bytes,
+      contentType: contentType,
+      uploadedUrl: uploadedUrl ?? this.uploadedUrl,
+      moderation: moderation ?? this.moderation,
+    );
+  }
 }
